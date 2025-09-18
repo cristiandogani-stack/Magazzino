@@ -3,3 +3,12 @@ Avvio: 18/09/2025 13:41:00,25
 C:\Program Files\Git\cmd\git.exe
 C:\Program Files\Git\mingw64\bin\git.exe
 https://github.com/cristiandogani-stack/Magazzino.git
+warning: in the working copy of 'push_log.txt', LF will be replaced by CRLF the next time Git touches it
+[main 0781ba2] Aggiornamento forzato del 18/09/2025 13:41:00,89
+ 2 files changed, 80 insertions(+), 24 deletions(-)
+ create mode 100644 push_log.txt
+=============================================================
+Avvio: 18/09/2025 14:06:49,30 
+C:\Program Files\Git\cmd\git.exe
+C:\Program Files\Git\mingw64\bin\git.exe
+https://github.com/cristiandogani-stack/Magazzino.git
