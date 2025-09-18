@@ -1,0 +1,657 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-lg">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="m-0">Anagrafiche articoli</h2>
+            <div class="d-flex gap-2">
+        {# Sostituiamo il link Aggiorna con un pulsante submit che invia il form delle anagrafiche.
+           In questo modo i valori di soglia e quantità immessi vengono salvati prima del refresh
+           e non vengono azzerati. Usiamo l'attributo ``form`` per riferirci al form
+           definito più sotto con id="anagrafica-form". #}
+        <button type="submit" class="btn btn-outline-primary" form="anagrafica-form">Aggiorna</button>
+        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalAggiungiArticoli">
+            Aggiungi Articoli
+        </button>
+    </div>
+    </div>
+
+    <!-- Modal Aggiungi Articoli -->
+    <div class="modal fade" id="modalAggiungiArticoli" tabindex="-1" aria-labelledby="modalAggiungiArticoliLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="modalAggiungiArticoliLabel">Aggiungi Articoli</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+          </div>
+          <div class="modal-body">
+            <p class="text-muted">Compila i campi per aggiungere un nuovo articolo al catalogo.</p>
+            <form method="POST" action="{{ url_for('add_articolo_catalogo') }}" class="row gy-2 gx-2 align-items-end mb-4">
+                <div class="col-md-3 col-12">
+                    <label for="materiale_catalogo" class="form-label mb-1">Materiale</label>
+                    <select name="materiale_catalogo" id="materiale_catalogo" class="form-select" required>
+                        <option value="" selected disabled>Seleziona materiale</option>
+                        {% for m in materiali_list %}
+                            <option value="{{ m }}">{{ m }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 col-12">
+                    <label for="tipo_catalogo" class="form-label mb-1">Tipo</label>
+                    <select name="tipo_catalogo" id="tipo_catalogo" class="form-select">
+                        <option value="">—</option>
+                        {% for t in tipi_list %}
+                            <option value="{{ t }}">{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 col-12">
+                    <label for="spessore_catalogo" class="form-label mb-1">Spessore</label>
+                    <input list="spessore-options" name="spessore_catalogo" id="spessore_catalogo" class="form-control" placeholder="es. 2" />
+                    <datalist id="spessore-options">
+                        {% for v in spessori_list %}
+                            <option value="{{ v }}"></option>
+                        {% endfor %}
+                    </datalist>
+                </div>
+                <div class="col-md-1 col-12">
+                    <label for="dimensione_x_catalogo" class="form-label mb-1">Dim X</label>
+                    <input list="dimensione-x-options" name="dimensione_x_catalogo" id="dimensione_x_catalogo" class="form-control" placeholder="es. 200" />
+                    <datalist id="dimensione-x-options">
+                        {% for v in dimensione_x_list %}
+                            <option value="{{ v }}"></option>
+                        {% endfor %}
+                    </datalist>
+                </div>
+                <div class="col-md-1 col-12">
+                    <label for="dimensione_y_catalogo" class="form-label mb-1">Dim Y</label>
+                    <input list="dimensione-y-options" name="dimensione_y_catalogo" id="dimensione_y_catalogo" class="form-control" placeholder="es. 150" />
+                    <datalist id="dimensione-y-options">
+                        {% for v in dimensione_y_list %}
+                            <option value="{{ v }}"></option>
+                        {% endfor %}
+                    </datalist>
+                </div>
+                <!-- Produttore: nuovo campo per associare la combinazione al produttore -->
+                <div class="col-md-2 col-12">
+                    <label for="produttore_catalogo" class="form-label mb-1">Produttore</label>
+                    <select name="produttore_catalogo" id="produttore_catalogo" class="form-select">
+                        <option value="">—</option>
+                        {% for p in produttori %}
+                            <option value="{{ p['nome'] }}">{{ p['nome'] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-1 col-12 d-grid">
+                    <button type="submit" class="btn btn-primary mt-md-0 mt-3">Aggiungi</button>
+                </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <form method="POST" id="anagrafica-form">
+        {#
+          Blocco filtri spostato sopra la tabella.
+          In precedenza i filtri (materiale, tipo, spessore, dimensioni) erano
+          inseriti all'interno dell'header della tabella.  Per offrire una
+          migliore leggibilità e permettere l'aggiunta del filtro per il
+          produttore, i controlli sono ora collocati in un'area dedicata
+          immediatamente sopra la tabella.  Ogni filtro è identificato da
+          un ID univoco (es. flt-materiale) che viene utilizzato dallo
+          script per applicare i criteri di ricerca.  È possibile scegliere
+          «Tutti» per disattivare un filtro.  Alla fine della fila dei
+          selettori sono presenti due pulsanti: “Filtra” applica i filtri
+          selezionati, mentre “Reset” ripristina i valori predefiniti.
+        #}
+        <div class="mb-3" id="filter-container">
+            <div class="row g-2 align-items-end bg-light py-2 px-2 rounded">
+                <div class="col-md-2 col-6">
+                    <label for="flt-materiale" class="form-label mb-1 small">Materiale</label>
+                    <select class="form-select form-select-sm" id="flt-materiale">
+                        <option value="">Tutti</option>
+                        {% for m in materiali_list %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 col-6">
+                    <label for="flt-tipo" class="form-label mb-1 small">Tipo</label>
+                    <select class="form-select form-select-sm" id="flt-tipo">
+                        <option value="">Tutti</option>
+                        {% for t in tipi_list %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 col-6">
+                    <label for="flt-spessore" class="form-label mb-1 small">Spessore</label>
+                    <select class="form-select form-select-sm" id="flt-spessore">
+                        <option value="">Tutti</option>
+                        {% for s in spessori_list %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-1 col-6">
+                    <label for="flt-dimx" class="form-label mb-1 small">Dim X</label>
+                    <select class="form-select form-select-sm" id="flt-dimx">
+                        <option value="">Tutti</option>
+                        {% for x in dimensione_x_list %}<option value="{{ x }}">{{ x }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-1 col-6">
+                    <label for="flt-dimy" class="form-label mb-1 small">Dim Y</label>
+                    <select class="form-select form-select-sm" id="flt-dimy">
+                        <option value="">Tutti</option>
+                        {% for y in dimensione_y_list %}<option value="{{ y }}">{{ y }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 col-6">
+                    <label for="flt-produttore" class="form-label mb-1 small">Produttore</label>
+                    <select class="form-select form-select-sm" id="flt-produttore">
+                        <option value="">Tutti</option>
+                        {% for p in produttori %}
+                            <option value="{{ p['nome'] }}">{{ p['nome'] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 col-12 d-flex justify-content-start align-items-center gap-2 mt-1 mt-md-3">
+                    <button type="button" id="btn-apply-filters" class="btn btn-sm btn-primary">Filtra</button>
+                    <button type="button" id="btn-reset-filters" class="btn btn-sm btn-secondary">Reset</button>
+                </div>
+            </div>
+        </div>
+        <div class="table-responsive mb-3">
+            <!-- Tabella principale per l'anagrafica articoli. Utilizziamo un ID
+                 specifico e la classe table-sm per ridurre l'altezza delle righe. -->
+            <table id="tab-anagrafiche-catalogo" class="table table-striped table-sm align-middle text-center anagrafiche-table">
+                <thead>
+                    <tr>
+                        <th>Materiale</th>
+                        <th>Tipo</th>
+                        <th>Spessore</th>
+                        <th>Dimensione&nbsp;X</th>
+                        <th>Dimensione&nbsp;Y</th>
+                        <!-- Nuova colonna: produttore associato alla combinazione (singolo produttore) -->
+                        <th>Produttore</th>
+                        <th>Quantità&nbsp;Attuale</th>
+                        <th>Soglia di riordino</th>
+                        <th>Quantità di riordino</th>
+                        <th>Azioni</th>
+                    </tr>
+
+                {# La riga dei filtri è stata rimossa dalla testa della tabella.  I filtri
+                   vengono ora mostrati in un'area separata sopra la tabella. #}
+
+                </thead>
+                <tbody>
+                {% for row in pairs %}
+                    <tr data-m="{{ row.materiale }}"
+                        data-tipo="{{ row.tipo or '' }}"
+                        data-sp="{{ row.spessore or '' }}"
+                        data-dx="{{ row.dimensione_x or '' }}"
+                        data-dy="{{ row.dimensione_y or '' }}"
+                        data-produttore="{{ row.produttore or '' }}">
+                        <td>{{ row.materiale }}</td>
+                        <td>{{ row.tipo if row.tipo else '—' }}</td>
+                        <td>{{ row.spessore if row.spessore else '—' }}</td>
+                        <td>{{ row.dimensione_x if row.dimensione_x else '—' }}</td>
+                        <td>{{ row.dimensione_y if row.dimensione_y else '—' }}</td>
+                        <!-- Colonna produttore: mostra il singolo produttore associato alla combinazione -->
+                        <td>
+                            {% if row.produttore and row.produttore|length > 0 %}
+                                {{ row.produttore }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>{{ row.quantita_attuale }}</td>
+                        <td>
+                            <!-- Manteniamo le chiavi nascoste per materiale, tipo e spessore.  Le dimensioni sono solo informative -->
+                            <input type="hidden" name="materiale[]" value="{{ row.materiale }}">
+                            <input type="hidden" name="tipo[]" value="{{ row.tipo }}">
+                            <input type="hidden" name="spessore[]" value="{{ row.spessore }}">
+                            <!-- Nuovi campi nascosti per includere le dimensioni e il produttore nella combinazione dell'articolo.
+                                 Questi valori vengono inviati al server insieme alle soglie per permettere l'identificazione univoca
+                                 dell'articolo.  L'ID dell'articolo viene fornito se disponibile (altrimenti stringa vuota). -->
+                            <input type="hidden" name="dimensione_x[]" value="{{ row.dimensione_x }}">
+                            <input type="hidden" name="dimensione_y[]" value="{{ row.dimensione_y }}">
+                            <input type="hidden" name="produttore[]" value="{{ row.produttore }}">
+                            <input type="hidden" name="articolo_id[]" value="{{ row.articolo_id if row.articolo_id is not none else '' }}">
+                            <!-- Input della soglia: aggiungiamo attributi data-* per la chiamata AJAX -->
+                            <input type="number" min="0" class="form-control soglia-input" name="soglia[]" value="{{ row.soglia }}"
+                                   data-materiale="{{ row.materiale }}"
+                                   data-tipo="{{ row.tipo or '' }}"
+                                   data-spessore="{{ row.spessore or '' }}"
+                                   data-dx="{{ row.dimensione_x or '' }}"
+                                   data-dy="{{ row.dimensione_y or '' }}"
+                                   data-produttore="{{ row.produttore or '' }}"
+                                   required>
+                        </td>
+                        <td>
+                            <!-- Nuova colonna: quantità di riordino. Se presente mostra il valore, altrimenti lascia vuoto -->
+                            <input type="number" min="1" class="form-control quantita-riordino-input" name="quantita_riordino[]" value="{{ row.quantita_riordino if row.quantita_riordino is not none else 1 }}" placeholder="1"
+                                   data-materiale="{{ row.materiale }}"
+                                   data-tipo="{{ row.tipo or '' }}"
+                                   data-spessore="{{ row.spessore or '' }}"
+                                   data-dx="{{ row.dimensione_x or '' }}"
+                                   data-dy="{{ row.dimensione_y or '' }}"
+                                   data-produttore="{{ row.produttore or '' }}">
+                        </td>
+                        <td class="text-nowrap">
+                            {% if row.articolo_id %}
+                            <!-- Rimosso pulsante preferiti; resta solo il pulsante di eliminazione -->
+                            <form method="POST" action="{{ url_for('delete_articolo_catalogo', articolo_id=row.articolo_id) }}" class="d-inline" onsubmit="return confirm('Eliminare questa combinazione dal catalogo?');">
+                                <button type="submit" class="btn btn-sm btn-danger">Elimina</button>
+                            </form>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="mb-3">
+        </div>
+        <!-- Rimosso il pulsante di salvataggio: le soglie e le quantità di riordino vengono aggiornate automaticamente all'uscita dal campo -->
+    </form>
+    <!-- Gestione fornitori -->
+    <h3 id="fornitori" class="mt-5">Fornitori</h3>
+    <p class="text-muted">Aggiungi o rimuovi i fornitori disponibili.  Oltre al nome, puoi indicare anche un indirizzo e‑mail che verrà utilizzato per le richieste di riordino.</p>
+    <!-- Form per aggiungere un nuovo fornitore -->
+    <form method="POST" action="{{ url_for('dizionario_fornitori') }}" class="row gx-2 gy-2 align-items-center mb-4">
+        <div class="col-md-5 col-sm-6 col-12">
+            <input type="text" name="nome" class="form-control" placeholder="Nome fornitore..." required>
+        </div>
+        <div class="col-md-5 col-sm-6 col-12">
+            <input type="email" name="email" class="form-control" placeholder="Email">
+        </div>
+        <div class="col-md-2 col-12">
+            <button type="submit" class="btn btn-primary w-100">Aggiungi</button>
+        </div>
+    </form>
+    <!-- Tabella dei fornitori esistenti -->
+    <div class="table-responsive">
+        <!-- Tabella dei fornitori. Usiamo un ID dedicato e la classe table-sm
+             per mantenere una spaziatura coerente. -->
+        <table id="tab-fornitori" class="table table-striped table-sm align-middle text-center anagrafiche-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Fornitore</th>
+                    <th>Email</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for f in suppliers %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ f['nome'] }}</td>
+                    <td>{{ f['email'] if f['email'] else '—' }}</td>
+                    <td class="text-nowrap">
+                        <!-- Pulsante per modificare il fornitore: apre un modal -->
+                        <button type="button" class="btn btn-sm btn-secondary me-1" data-bs-toggle="modal" data-bs-target="#editForn-{{ f['id'] }}">Modifica</button>
+                        <form method="POST" action="{{ url_for('delete_fornitore_vocab', fornitore_id=f['id']) }}" onsubmit="return confirm('Sei sicuro di voler eliminare questo fornitore dal dizionario?');" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-danger">Elimina</button>
+                        </form>
+                        <!-- Modal modifica fornitore -->
+                        <div class="modal fade" id="editForn-{{ f['id'] }}" tabindex="-1" aria-labelledby="editFornLabel-{{ f['id'] }}" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <form method="POST" action="{{ url_for('update_fornitore', fornitore_id=f['id']) }}">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="editFornLabel-{{ f['id'] }}">Modifica fornitore</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="mb-3">
+                                                <label for="editNome-{{ f['id'] }}" class="form-label">Nome</label>
+                                                <input type="text" class="form-control" id="editNome-{{ f['id'] }}" name="nome" value="{{ f['nome'] }}" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="editEmail-{{ f['id'] }}" class="form-label">Email (opzionale)</label>
+                                                <input type="email" class="form-control" id="editEmail-{{ f['id'] }}" name="email" value="{{ f['email'] if f['email'] else '' }}">
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                                            <button type="submit" class="btn btn-primary">Salva</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="4" class="text-center">Nessun fornitore presente nel dizionario.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Sezione Gestione produttori spostata nella pagina Dizionario sotto la sezione Tipi di lavorazione -->
+
+    {% if false %}
+    <!-- Gestione articoli catalogo -->
+    <h3 id="articoli" class="mt-5">Gestione articoli catalogo</h3>
+    <p class="text-muted">Qui puoi definire manualmente nuove combinazioni di materiale, tipo, spessore e dimensioni. Queste combinazioni saranno disponibili per impostare le soglie di riordino anche se non esistono ancora materiali in magazzino.</p>
+    <!-- Form per aggiungere un nuovo articolo al catalogo -->
+    <form method="POST" action="{{ url_for('add_articolo_catalogo') }}" class="row gy-2 gx-2 align-items-end mb-4">
+        <div class="col-md-3 col-12">
+            <label for="materiale_catalogo" class="form-label mb-1">Materiale</label>
+            <select name="materiale_catalogo" id="materiale_catalogo" class="form-select" required>
+                <option value="" selected disabled>Seleziona materiale</option>
+                {% for m in materiali_list %}
+                    <option value="{{ m }}">{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2 col-12">
+            <label for="tipo_catalogo" class="form-label mb-1">Tipo</label>
+            <select name="tipo_catalogo" id="tipo_catalogo" class="form-select">
+                <option value="">—</option>
+                {% for t in tipi_list %}
+                    <option value="{{ t }}">{{ t }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2 col-12">
+            <label for="spessore_catalogo" class="form-label mb-1">Spessore</label>
+            <input list="spessore-options" name="spessore_catalogo" id="spessore_catalogo" class="form-control" placeholder="es. 2" />
+            <datalist id="spessore-options">
+                {% for v in spessori_list %}
+                    <option value="{{ v }}"></option>
+                {% endfor %}
+            </datalist>
+        </div>
+        <div class="col-md-2 col-12">
+            <label for="dimensione_x_catalogo" class="form-label mb-1">Dim X</label>
+            <input list="dimensione-x-options" name="dimensione_x_catalogo" id="dimensione_x_catalogo" class="form-control" placeholder="es. 200" />
+            <datalist id="dimensione-x-options">
+                {% for v in dimensione_x_list %}
+                    <option value="{{ v }}"></option>
+                {% endfor %}
+            </datalist>
+        </div>
+        <div class="col-md-2 col-12">
+            <label for="dimensione_y_catalogo" class="form-label mb-1">Dim Y</label>
+            <input list="dimensione-y-options" name="dimensione_y_catalogo" id="dimensione_y_catalogo" class="form-control" placeholder="es. 150" />
+            <datalist id="dimensione-y-options">
+                {% for v in dimensione_y_list %}
+                    <option value="{{ v }}"></option>
+                {% endfor %}
+            </datalist>
+        </div>
+        <div class="col-md-1 col-12 d-grid">
+            <button type="submit" class="btn btn-primary mt-md-0 mt-3">Aggiungi</button>
+        </div>
+    </form>
+    <!-- Tabella degli articoli catalogo esistenti -->
+    <div class="table-responsive">
+        <!-- Tabella degli articoli catalogo nascosta. Assegniamo un ID univoco e la classe table-sm. -->
+        <table id="tab-articoli-catalogo" class="table table-striped table-sm align-middle text-center anagrafiche-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Materiale</th>
+                    <th>Tipo</th>
+                    <th>Spessore</th>
+                    <th>Dim&nbsp;X</th>
+                    <th>Dim&nbsp;Y</th>
+                    <th>Preferito</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+{% for art in articoli_catalogo %}
+                <tr data-m="{{ art.materiale }}"
+                    data-tipo="{{ art.tipo or '' }}"
+                    data-sp="{{ art.spessore or '' }}"
+                    data-dx="{{ art.dimensione_x or '' }}"
+                    data-dy="{{ art.dimensione_y or '' }}">
+                    <td>{{ loop.index }}</td>
+                    <td>{{ art.materiale }}</td>
+                    <td>{{ art.tipo if art.tipo else '—' }}</td>
+                    <td>{{ art.spessore if art.spessore else '—' }}</td>
+                    <td>{{ art.dimensione_x if art.dimensione_x else '—' }}</td>
+                    <td>{{ art.dimensione_y if art.dimensione_y else '—' }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('toggle_preferito', articolo_id=art.id) }}">
+                            {% if art.preferito %}
+                                <button type="submit" class="btn btn-sm btn-warning" title="Rimuovi dai preferiti">★</button>
+                            {% else %}
+                                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Aggiungi ai preferiti">☆</button>
+                            {% endif %}
+                        </form>
+                    </td>
+                    <td>
+                        <form method="POST" action="{{ url_for('delete_articolo_catalogo', articolo_id=art.id) }}" onsubmit="return confirm('Sei sicuro di voler eliminare questa combinazione dal catalogo?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Elimina</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="8" class="text-center">Nessuna combinazione presente nel catalogo.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Seleziona la tabella dell'anagrafica utilizzando il nuovo ID definito
+  const table = document.getElementById('tab-anagrafiche-catalogo');
+  if (!table) return;
+  const tbody = table.querySelector('tbody');
+  function matches(cellText, value) {
+    if (!value) return true;
+    return (cellText || '').toString().trim().toLowerCase() === value.toString().trim().toLowerCase();
+  }
+  function applyFilters() {
+    const vMat  = document.getElementById('flt-materiale').value;
+    const vTipo = document.getElementById('flt-tipo').value;
+    const vSp   = document.getElementById('flt-spessore').value;
+    const vX    = document.getElementById('flt-dimx').value;
+    const vY    = document.getElementById('flt-dimy').value;
+    const vProd = document.getElementById('flt-produttore') ? document.getElementById('flt-produttore').value : '';
+    Array.from(tbody.querySelectorAll('tr')).forEach(function(tr){
+      const tds = tr.querySelectorAll('td');
+      if (!tds.length) return;
+      const ok = matches(tds[0].textContent, vMat)
+             && matches(tds[1].textContent, vTipo)
+             && matches(tds[2].textContent, vSp)
+             && matches(tds[3].textContent, vX)
+             && matches(tds[4].textContent, vY)
+             && matches(tds[5].textContent, vProd);
+      tr.style.display = ok ? '' : 'none';
+    });
+  }
+  document.getElementById('btn-apply-filters').addEventListener('click', applyFilters);
+  document.getElementById('btn-reset-filters').addEventListener('click', function(){
+    ['flt-materiale','flt-tipo','flt-spessore','flt-dimx','flt-dimy','flt-produttore'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    applyFilters();
+  });
+  // Auto-apply on change
+  ['flt-materiale','flt-tipo','flt-spessore','flt-dimx','flt-dimy','flt-produttore'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', applyFilters);
+  });
+});
+</script>
+<!-- Evidenzia e scrolla sulla riga appena aggiunta -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const p = new URLSearchParams(window.location.search);
+  const m = p.get('hl_mat');
+  // Se il parametro materiale non è presente non evidenziamo nulla
+  if (m === null) return;
+  const t  = p.get('hl_tipo') || '';
+  const sp = p.get('hl_sp')   || '';
+  const dx = p.get('hl_dx')   || '';
+  const dy = p.get('hl_dy')   || '';
+  const prod = p.get('hl_produttore') || '';
+  const rows = document.querySelectorAll('#tab-anagrafiche-catalogo tbody tr');
+  let target = null;
+  rows.forEach(tr => {
+    if ((tr.dataset.m || '')          === m &&
+        (tr.dataset.tipo || '')       === t &&
+        (tr.dataset.sp || '')         === sp &&
+        (tr.dataset.dx || '')         === dx &&
+        (tr.dataset.dy || '')         === dy &&
+        (tr.dataset.produttore || '') === prod) {
+      target = tr;
+    }
+  });
+  if (target) {
+    target.classList.add('table-warning');
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => target.classList.remove('table-warning'), 4000);
+  }
+});
+</script>
+{% endblock %}
+
+{% endblock %}
+<!-- Modal upload documenti per combinazione catalogo -->
+<div class="modal fade" id="modalDocsCatalogo" tabindex="-1" aria-labelledby="modalDocsCatalogoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content" method="POST" action="{{ url_for('upload_docs_combo') }}" enctype="multipart/form-data" id="docs-catalogo-form">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalDocsCatalogoLabel">Allega documenti alla combinazione</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" name="materiale" id="docs2-mat">
+        <input type="hidden" name="tipo" id="docs2-tipo">
+        <input type="hidden" name="spessore" id="docs2-spessore">
+        <input type="hidden" name="dimensione_x" id="docs2-dx">
+        <input type="hidden" name="dimensione_y" id="docs2-dy">
+        <input type="hidden" name="produttore" id="docs2-produttore">
+        <div class="mb-2">
+            <label class="form-label">Seleziona documenti (PDF/JPG/PNG)</label>
+            <input type="file" name="documents" class="form-control" multiple>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Annulla</button>
+        <button type="submit" class="btn btn-primary">Carica</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var docsModal = document.getElementById('modalDocsCatalogo');
+  if (docsModal) {
+    docsModal.addEventListener('show.bs.modal', function (event) {
+      var btn = event.relatedTarget;
+      document.getElementById('docs2-mat').value = btn.getAttribute('data-mat') || '';
+      document.getElementById('docs2-tipo').value = btn.getAttribute('data-tipo') || '';
+      document.getElementById('docs2-spessore').value = btn.getAttribute('data-sp') || '';
+      document.getElementById('docs2-dx').value = btn.getAttribute('data-dx') || '';
+      document.getElementById('docs2-dy').value = btn.getAttribute('data-dy') || '';
+      // Memorizza anche il produttore per associare i documenti alla combinazione completa
+      // Alcuni pulsanti possono utilizzare l'attributo data-prod oppure data-produttore
+      var prodAttr = btn.getAttribute('data-prod');
+      if (!prodAttr) {
+        prodAttr = btn.getAttribute('data-produttore');
+      }
+      document.getElementById('docs2-produttore').value = prodAttr || '';
+    });
+  }
+});
+</script>
+
+<!-- Script per aggiornare soglie e quantità di riordino senza ricaricare la pagina -->
+<script>
+// Inizializza gli handler quando il DOM è pronto
+document.addEventListener('DOMContentLoaded', function () {
+  // Gestisce il cambio della soglia di riordino
+  document.querySelectorAll('.soglia-input').forEach(function (input) {
+    input.addEventListener('change', function (event) {
+      var el = event.target;
+      var materiale = el.dataset.materiale || '';
+      var tipo = el.dataset.tipo || '';
+      var spessore = el.dataset.spessore || '';
+      // Recupera dimensioni e produttore dal dataset per identificare univocamente la combinazione
+      var dx = el.dataset.dx || '';
+      var dy = el.dataset.dy || '';
+      var produttore = el.dataset.produttore || '';
+      var val = el.value;
+      // Effettua la richiesta POST all'endpoint dedicato
+      fetch('{{ url_for('update_soglia') }}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          materiale: materiale,
+          tipo: tipo,
+          spessore: spessore,
+          dimensione_x: dx,
+          dimensione_y: dy,
+          produttore: produttore,
+          soglia: val
+        })
+      }).then(function (resp) {
+        if (!resp.ok) throw new Error('Errore nella risposta');
+        return resp.json();
+      }).then(function (data) {
+        // Feedback visivo: soglia salvata con successo
+        el.classList.remove('is-invalid');
+        el.classList.add('is-valid');
+      }).catch(function (err) {
+        // Errore: evidenziamo il campo in rosso
+        el.classList.remove('is-valid');
+        el.classList.add('is-invalid');
+      });
+    });
+  });
+  // Gestisce il cambio della quantità di riordino
+  document.querySelectorAll('.quantita-riordino-input').forEach(function (input) {
+    input.addEventListener('change', function (event) {
+      var el = event.target;
+      var materiale = el.dataset.materiale || '';
+      var tipo = el.dataset.tipo || '';
+      var spessore = el.dataset.spessore || '';
+      // Recupera dimensioni e produttore per identificare univocamente la combinazione
+      var dx = el.dataset.dx || '';
+      var dy = el.dataset.dy || '';
+      var produttore = el.dataset.produttore || '';
+      var val = el.value;
+      fetch('{{ url_for('update_quantita_riordino') }}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          materiale: materiale,
+          tipo: tipo,
+          spessore: spessore,
+          dimensione_x: dx,
+          dimensione_y: dy,
+          produttore: produttore,
+          quantita: val
+        })
+      }).then(function (resp) {
+        if (!resp.ok) throw new Error('Errore nella risposta');
+        return resp.json();
+      }).then(function (data) {
+        el.classList.remove('is-invalid');
+        el.classList.add('is-valid');
+      }).catch(function (err) {
+        el.classList.remove('is-valid');
+        el.classList.add('is-invalid');
+      });
+    });
+  });
+});
+</script>

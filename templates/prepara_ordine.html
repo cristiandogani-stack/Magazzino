@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-lg">
+    <h2 class="mb-3">Prepara ordine</h2>
+    <p class="text-muted">Ecco una bozza di email con i materiali selezionati per il riordino.</p>
+    <!-- Informazioni sui fornitori: se manca l'email consenti all'utente di inserirla -->
+    <div class="mb-3">
+        {% if suppliers and suppliers|length > 0 %}
+            {% if suppliers|length == 1 %}
+                <strong>Fornitore:</strong>
+                {{ suppliers[0]['nome'] }}
+                {% if suppliers[0]['email'] %}
+                    ({{ suppliers[0]['email'] }})
+                {% else %}
+                    <!-- Input per email mancante del fornitore -->
+                    <div class="mt-2">
+                        <label class="form-label mb-1 small" for="supplier_email_{{ suppliers[0]['id'] or 0 }}">Inserisci email per {{ suppliers[0]['nome'] }}:</label>
+                        <input type="email" name="supplier_email_{{ suppliers[0]['id'] or 0 }}" id="supplier_email_{{ suppliers[0]['id'] or 0 }}" class="form-control form-control-sm" placeholder="Email" required form="conferma-form">
+                    </div>
+                {% endif %}
+            {% else %}
+                <strong>Fornitori:</strong>
+                <ul class="mb-0 list-unstyled">
+                    {% for s in suppliers %}
+                        <li>
+                            {{ s['nome'] }}
+                            {% if s['email'] %}
+                                ({{ s['email'] }})
+                            {% else %}
+                                <!-- Input per email mancante del fornitore -->
+                                <div class="mt-2">
+                                    <label class="form-label mb-1 small" for="supplier_email_{{ s['id'] or loop.index0 }}">Inserisci email per {{ s['nome'] }}:</label>
+                                    <input type="email" name="supplier_email_{{ s['id'] or loop.index0 }}" id="supplier_email_{{ s['id'] or loop.index0 }}" class="form-control form-control-sm" placeholder="Email" required form="conferma-form">
+                                </div>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% else %}
+            <strong>Fornitore:</strong> &mdash;
+        {% endif %}
+    </div>
+    <!-- Visualizzazione dei produttori selezionati o dedotti -->
+    <div class="mb-3">
+        {% if producers and producers|length > 0 %}
+            {% if producers|length == 1 %}
+                <strong>Produttore:</strong>
+                {{ producers[0]['nome'] }}
+            {% else %}
+                <strong>Produttori:</strong>
+                <ul class="mb-0">
+                    {% for p in producers %}
+                        <li>{{ p['nome'] }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% else %}
+            <strong>Produttore:</strong> &mdash;
+        {% endif %}
+    </div>
+    <!-- Campo modificabile per l'oggetto dell'email.  L'input è associato al
+         form di conferma tramite l'attributo "form" così che venga inviato
+         assieme agli altri dati.  È pre‑compilato con l'oggetto suggerito ma
+         l'utente può personalizzarlo prima dell'invio. -->
+    <div class="mb-3">
+        <label for="subject-field" class="form-label"><strong>Oggetto:</strong></label>
+        <input type="text" name="subject" id="subject-field" class="form-control" value="{{ subject }}" form="conferma-form">
+    </div>
+    <!-- Campo modificabile per il corpo dell'email.  Utilizziamo una textarea
+         per consentire all'utente di modificare liberamente il testo.  La
+         textarea è pre‑compilata con il corpo dell'email generato
+         automaticamente e viene inviata insieme al form di conferma. -->
+    <div class="mb-3">
+        <label for="body-field" class="form-label"><strong>Corpo dell'email:</strong></label>
+        <textarea name="body" id="body-field" class="form-control" rows="10" form="conferma-form">{{ body }}</textarea>
+    </div>
+    {% if mailto_link %}
+    <div class="mb-4">
+        <a href="{{ mailto_link }}" class="btn btn-primary" target="_blank">Apri nel client di posta</a>
+    </div>
+    {% else %}
+    <div class="alert alert-warning">
+        {% if suppliers and suppliers|length > 1 %}
+            Nessuno dei fornitori selezionati ha un indirizzo email registrato. Copia manualmente il testo qui sopra per inviare la richiesta.
+        {% elif suppliers and suppliers|length == 1 %}
+            Il fornitore selezionato non ha un indirizzo email registrato. Copia manualmente il testo qui sopra per inviare la richiesta.
+        {% else %}
+            Nessun fornitore con indirizzo email disponibile. Copia manualmente il testo qui sopra per inviare la richiesta.
+        {% endif %}
+    </div>
+    {% endif %}
+    <!-- Pulsante per confermare e inviare l'ordine.
+         Questa form invia i dati al nuovo endpoint /conferma_e_invia. Include
+         tutte le combinazioni selezionate e gli ID dei fornitori come input
+         nascosti. -->
+    <form id="conferma-form" method="POST" action="{{ url_for('conferma_e_invia') }}" class="mb-4">
+        {% for itm in items %}
+            <input type="hidden" name="materiale" value="{{ itm['materiale'] }}">
+            <input type="hidden" name="tipo" value="{{ itm['tipo'] }}">
+            <input type="hidden" name="spessore" value="{{ itm['spessore'] }}">
+            <input type="hidden" name="dimensione_x" value="{{ itm['dimensione_x'] }}">
+            <input type="hidden" name="dimensione_y" value="{{ itm['dimensione_y'] }}">
+            <input type="hidden" name="quantita" value="{{ itm['quantita'] }}">
+            {# Includi anche il produttore come campo nascosto per ciascuna combinazione #}
+            <input type="hidden" name="produttore" value="{{ itm['produttore'] }}">
+        {% endfor %}
+        {% for sup in suppliers %}
+            {% if sup['id'] is not none %}
+            <input type="hidden" name="fornitore_ids" value="{{ sup['id'] }}">
+            {% endif %}
+        {% endfor %}
+        {# Includi anche gli ID dei produttori selezionati per la conferma #}
+        {% for pr in producers %}
+            {% if pr['id'] is not none %}
+            <input type="hidden" name="produttore_ids" value="{{ pr['id'] }}">
+            {% endif %}
+        {% endfor %}
+        <button type="submit" class="btn btn-success">Conferma e invia</button>
+    </form>
+    <a href="{{ url_for('riordini') }}" class="btn btn-secondary">Torna ai riordini</a>
+</div>
+{% endblock %}

@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-lg">
+    <h2>Aggiungi bancale/lastra</h2>
+    <form method="POST">
+        <!-- Toggle per creare un nuovo ordine invece di aggiungere immediatamente il materiale.  La
+             posizione è in alto a destra sopra il modulo.  Quando selezionato, i campi compilati
+             verranno salvati come ordine in attesa di accettazione e non verranno creati subito
+             i bancali/lastre. -->
+        <div class="d-flex justify-content-end align-items-center mb-3">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="nuovo-ordine-toggle" name="nuovo_ordine">
+                <label class="form-check-label" for="nuovo-ordine-toggle">Nuovo ordine</label>
+            </div>
+        </div>
+        <div class="row">
+            <!-- Selezione materiale dal dizionario -->
+            <div class="col-md-6 mb-3">
+                <div class="d-flex justify-content-between align-items-baseline">
+                    <label class="form-label mb-0">Materiale *</label>
+                    {# Mostra il link "Gestisci dizionario" solo agli utenti con
+                       permesso "accessi" (Admin).  Gli altri non vedono il link. #}
+                    {% if 'accessi' in session.get('allowed_tabs', []) %}
+                    <a href="{{ url_for('dizionario') }}" class="small text-decoration-none">Gestisci dizionario</a>
+                    {% endif %}
+                </div>
+                <!-- Menu a tendina: consente la selezione di un materiale tra quelli presenti nel vocabolario.  Non è più
+                     possibile inserire materiale libero, così evitiamo la richiesta di conferma per l'aggiunta al dizionario. -->
+                <select name="materiale" class="form-select" required>
+                    <option value="" disabled {% if not prefill_materiale %}selected{% endif %}>-- Seleziona materiale --</option>
+                    {% for mat in materiali_list %}
+                        <option value="{{ mat }}" {% if prefill_materiale and prefill_materiale == mat %}selected{% endif %}>{{ mat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <!-- Quantità: se si crea un bancale con più lastre indicare >1 -->
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Quantità *</label>
+                <input type="number" name="quantita" class="form-control" min="1" value="{{ prefill_quantita if prefill_quantita is not none else 1 }}" required>
+            </div>
+        </div>
+        <div class="row">
+            <!-- Selezione del tipo di lavorazione/materiale -->
+            <div class="col-md-6 mb-3">
+                <div class="d-flex justify-content-between align-items-baseline">
+                    <label class="form-label mb-0">Tipo</label>
+                    {# Link di gestione tipi visibile solo agli utenti con permesso "accessi". #}
+                    {% if 'accessi' in session.get('allowed_tabs', []) %}
+                    <a href="{{ url_for('dizionario') }}#tipi" class="small text-decoration-none">Gestisci tipi</a>
+                    {% endif %}
+                </div>
+                <select name="tipo" class="form-select" required>
+                    <option value="">-- Nessuno --</option>
+                    {% for t in tipi_list %}
+                        <option value="{{ t['nome'] }}" {% if prefill_tipo and prefill_tipo == t['nome'] %}selected{% endif %}>{{ t['nome'] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="row">
+            <!-- Dimensione X (in millimetri) -->
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Dimensione X (mm)</label>
+                <input list="dimensione-x-options" name="dimensione_x" class="form-control" placeholder="es. 200" required value="{{ prefill_dx if prefill_dx is not none else '' }}">
+                <datalist id="dimensione-x-options">
+                    {% for v in dimensione_x_list %}
+                        <option value="{{ v }}">
+                    {% endfor %}
+                </datalist>
+            </div>
+            <!-- Dimensione Y (in millimetri) -->
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Dimensione Y (mm)</label>
+                <input list="dimensione-y-options" name="dimensione_y" class="form-control" placeholder="es. 100" required value="{{ prefill_dy if prefill_dy is not none else '' }}">
+                <datalist id="dimensione-y-options">
+                    {% for v in dimensione_y_list %}
+                        <option value="{{ v }}">
+                    {% endfor %}
+                </datalist>
+            </div>
+            <!-- Spessore (in millimetri) -->
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Spessore (mm)</label>
+                <input list="spessori-options" name="spessore" class="form-control" placeholder="es. 30" required value="{{ prefill_spessore if prefill_spessore is not none else '' }}">
+                <datalist id="spessori-options">
+                    {% for v in spessori_list %}
+                        <option value="{{ v }}">
+                    {% endfor %}
+                </datalist>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-3 col-6 mb-3">
+                <label class="form-label">Ubicazione - Lettera *</label>
+                <select class="form-select" name="ubicazione_lettera" required>
+                    {% for lettera in lettere %}
+                        <option value="{{ lettera }}" {% if prefill_ubic_lettera and prefill_ubic_lettera == lettera %}selected{% endif %}>{{ lettera }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 col-6 mb-3">
+                <label class="form-label">Ubicazione - Numero *</label>
+                <select class="form-select" name="ubicazione_numero" required>
+                    {% for numero in numeri %}
+                        <option value="{{ numero }}" {% if prefill_ubic_numero and prefill_ubic_numero == numero %}selected{% endif %}>{{ numero }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <!-- Selezione del bancale padre (opzionale) -->
+            <div class="col-md-3 col-6 mb-3">
+                <label class="form-label">Bancale (opzionale)</label>
+                <select class="form-select" name="parent_id">
+                    <option value="">Nessuno</option>
+                    {% for p in pallets %}
+                        <option value="{{ p['id'] }}" {% if prefill_parent_id and prefill_parent_id == p['id'] %}selected{% endif %}>ID {{ p['id'] }} - {{ p['ubicazione_lettera'] }}{{ p['ubicazione_numero'] }} ({{ p['materiale'] }})</option>
+                    {% endfor %}
+                </select>
+                <small class="form-text text-muted">Seleziona un bancale per aggiungere una lastra ad esso.</small>
+            </div>
+            <!-- Flag sfrido -->
+            <div class="col-md-3 col-6 mb-3 d-flex align-items-center">
+                <div class="form-check mt-4">
+                    <input class="form-check-input" type="checkbox" name="sfrido" id="sfrido">
+                    <label class="form-check-label" for="sfrido">
+                        Sfrido
+                    </label>
+                </div>
+            </div>
+        </div>
+        <!-- Fornitore, Produttore e Note -->
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Fornitore</label>
+                <!-- Menu a tendina per il fornitore: mostra solo le opzioni presenti nel dizionario.  Se non si seleziona
+                     alcun valore, il campo rimane vuoto (facoltativo). -->
+                <select name="fornitore" class="form-select" required>
+                    <!-- Opzione vuota per selezionare nessun fornitore.  Se una precompilazione è presente,
+                         non viene selezionata l'opzione vuota. -->
+                    <option value="" {% if not prefill_fornitore %}selected{% endif %}>-- Nessuno --</option>
+                    {% for f in fornitori_list %}
+                        <option value="{{ f }}" {% if prefill_fornitore and prefill_fornitore == f %}selected{% endif %}>{{ f }}</option>
+                    {% endfor %}
+                </select>
+                {# Avviso per gestire l'elenco fornitori visibile solo agli utenti con permesso "accessi". #}
+                {% if 'accessi' in session.get('allowed_tabs', []) %}
+                <small class="form-text text-muted">Gestisci l'elenco dei fornitori <a href="{{ url_for('config') }}#fornitori">qui</a>.</small>
+                {% endif %}
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Produttore</label>
+                <!-- Menu a tendina per il produttore: visualizza solamente i produttori presenti nel dizionario.  Il
+                     campo non è obbligatorio, pertanto è presente un'opzione vuota. -->
+                <select name="produttore" class="form-select" required>
+                    <!-- Opzione vuota per selezionare nessun produttore.  Se una precompilazione è presente,
+                         non viene selezionata l'opzione vuota. -->
+                    <option value="" {% if not prefill_produttore %}selected{% endif %}>-- Nessuno --</option>
+                    {% for p in produttori_list %}
+                        <option value="{{ p }}" {% if prefill_produttore and prefill_produttore == p %}selected{% endif %}>{{ p }}</option>
+                    {% endfor %}
+                </select>
+                {# Avviso per gestire l'elenco produttori visibile solo agli utenti con permesso "accessi". #}
+                {% if 'accessi' in session.get('allowed_tabs', []) %}
+                <small class="form-text text-muted">Gestisci l'elenco dei produttori <a href="{{ url_for('config') }}#produttori">qui</a>.</small>
+                {% endif %}
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Note</label>
+                <textarea name="note" class="form-control" rows="2"></textarea>
+            </div>
+        </div>
+        <!-- Campo per la data prevista di arrivo del nuovo ordine.  È nascosto finché non si
+             seleziona il toggle "Nuovo ordine".  Quando visibile diventa obbligatorio. -->
+        <div class="row" id="data-arrivo-row" style="display: none;">
+            <div class="col-md-4 mb-3">
+                <label class="form-label" for="data-arrivo-input">Data di arrivo prevista *</label>
+                <input type="date" id="data-arrivo-input" name="data_arrivo" class="form-control">
+            </div>
+        </div>
+        <!-- Il pulsante principale per l'inserimento: rinominato in "Aggiungi" -->
+        <!-- Se stiamo confermando un'accettazione precompilata, includiamo hidden fields per l'ID di accettazione e la nuova quantità totale -->
+        {% if acc_id %}
+            <input type="hidden" name="acc_id" value="{{ acc_id }}">
+            {% if prefill_totale is not none %}
+                <input type="hidden" name="acc_q_totale_new" value="{{ prefill_totale }}">
+            {% endif %}
+        {% endif %}
+        <button type="submit" class="btn btn-success">Aggiungi</button>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Annulla</a>
+        <!-- Rimosso il pulsante dedicato al salvataggio delle anagrafiche: integrato nel flusso di Aggiungi -->
+    
+        <!-- Barra comandi in fondo a destra -->
+        <!-- Il pulsante DOCS è stato spostato nella pagina di conferma QR (added.html) dove gli ID delle lastre sono già disponibili.
+             In questo modulo non viene più mostrato il pulsante per allegare documenti. -->
+    </form>
+
+</div>
+<!-- Script principale: verifica la presenza del materiale nel dizionario e delle anagrafiche articolo prima di aggiungere il bancale/lastra -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var form = document.querySelector('form');
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    // Recupera il materiale selezionato dal menu a tendina.  Il campo è obbligatorio,
+    // quindi non effettuiamo alcuna validazione sulla presenza del materiale nel dizionario.
+    var materialeSelect = form.querySelector('select[name="materiale"]');
+    var selected = '';
+    if (materialeSelect) {
+      selected = materialeSelect.value.trim();
+    }
+    // Recupero i dati per l'anagrafica dell'articolo
+    var tipoSelect = form.querySelector('select[name="tipo"]');
+    var tipo = '';
+    if (tipoSelect) {
+      tipo = tipoSelect.value.trim();
+    }
+    var dimensioneX = form.querySelector('input[name="dimensione_x"]').value.trim();
+    var dimensioneY = form.querySelector('input[name="dimensione_y"]').value.trim();
+    var spessore = form.querySelector('input[name="spessore"]').value.trim();
+    // Produttore selezionato dall'utente (può essere vuoto)
+    var produttoreSelect = form.querySelector('select[name="produttore"]');
+    var produttoreVal = '';
+    if (produttoreSelect) {
+      produttoreVal = produttoreSelect.value.trim();
+    }
+    // Se il flag "sfrido" è attivo, salta completamente il controllo e la creazione
+    // delle anagrafiche articolo. In questo modo la richiesta di salvataggio delle
+    // combinazioni in "Anagrafiche articoli" non appare quando si aggiunge uno sfrido.
+    var sfridoInput = form.querySelector('input[name="sfrido"]');
+    var sfridoChecked = sfridoInput && sfridoInput.checked;
+    if (!sfridoChecked) {
+    try {
+      var payloadCheck = new URLSearchParams();
+      payloadCheck.append('materiale', selected);
+      payloadCheck.append('tipo', tipo);
+      payloadCheck.append('dimensione_x', dimensioneX);
+      payloadCheck.append('dimensione_y', dimensioneY);
+      payloadCheck.append('spessore', spessore);
+      // Includi il produttore per verificare la combinazione completa
+      payloadCheck.append('produttore', produttoreVal);
+      var res = await fetch('{{ url_for("check_articolo_catalogo") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: payloadCheck
+      });
+      if (res.ok) {
+        var data = await res.json();
+        if (!data.exists) {
+          // Se la combinazione non è presente nel catalogo articoli, salvala senza chiedere conferma.
+          var payloadSave = new URLSearchParams();
+          payloadSave.append('materiale_catalogo', selected);
+          payloadSave.append('tipo_catalogo', tipo);
+          payloadSave.append('spessore_catalogo', spessore);
+          payloadSave.append('dimensione_x_catalogo', dimensioneX);
+          payloadSave.append('dimensione_y_catalogo', dimensioneY);
+          payloadSave.append('produttore_catalogo', produttoreVal);
+          await fetch('{{ url_for("add_articolo_catalogo") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: payloadSave
+          });
+          // La soglia di riordino verrà inizializzata a 0 lato server.
+        }
+      }
+    } catch(err) {
+      console.error(err);
+    }
+    } // fine skip anagrafiche per sfrido
+    // Invio definitivo del form al server
+    form.submit();
+  });
+});
+</script>
+<!-- Script per gestire il toggle "Nuovo ordine".  Quando il toggle è attivo, il campo
+     per la data di arrivo viene mostrato e contrassegnato come obbligatorio.  Quando il
+     toggle è disattivato, il campo scompare e non è obbligatorio. -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var toggleEl = document.getElementById('nuovo-ordine-toggle');
+  var dateRow = document.getElementById('data-arrivo-row');
+  var dateInput = document.querySelector('input[name="data_arrivo"]');
+  function updateDateVisibility() {
+    if (toggleEl && dateRow && dateInput) {
+      if (toggleEl.checked) {
+        // Mostra il campo data e rendilo obbligatorio
+        dateRow.style.display = '';
+        dateInput.required = true;
+      } else {
+        // Nasconde il campo data e rimuove l'obbligatorietà
+        dateRow.style.display = 'none';
+        dateInput.required = false;
+        // Resetta eventuale valore selezionato per evitare confusione
+        dateInput.value = '';
+      }
+    }
+  }
+  if (toggleEl) {
+    toggleEl.addEventListener('change', updateDateVisibility);
+    // Chiama subito per impostare lo stato iniziale
+    updateDateVisibility();
+  }
+});
+</script>
+<!-- Script per salvare l'anagrafica dell'articolo nel catalogo -->
+<!-- (Rimosso script per il pulsante di salvataggio anagrafica ora integrato nel flusso principale) -->
+
+{% endblock %}

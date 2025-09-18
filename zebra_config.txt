@@ -1,0 +1,5 @@
+# Configurazione della stampante Zebra
+# Specifica l'indirizzo host e la porta della stampante zebra a cui inviare le etichette.
+# È possibile modificare questi valori per adattarsi alla propria infrastruttura.
+host=192.168.100.51
+port=9100

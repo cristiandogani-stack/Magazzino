@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-lg">
+    <h2>Prenota materiale</h2>
+    <p class="mb-3">Seleziona la data e l'ora entro cui il materiale deve essere prelevato. Al raggiungimento della scadenza la prenotazione verrà evidenziata in rosso nella pagina Magazzino Live.</p>
+    <div class="mb-3">
+        <ul class="list-group">
+            <li class="list-group-item"><strong>ID materiale:</strong> {{ materiale['id'] }}</li>
+            <li class="list-group-item"><strong>Materiale:</strong> {{ materiale['materiale'] }}</li>
+            <li class="list-group-item"><strong>Spessore:</strong> {{ materiale['spessore'] if materiale['spessore'] else '--' }}</li>
+            <li class="list-group-item"><strong>Ubicazione:</strong> {{ materiale['ubicazione_lettera'] }}-{{ materiale['ubicazione_numero'] }}</li>
+            <li class="list-group-item"><strong>Sfrido:</strong> {% if materiale['is_sfrido'] %}Sì{% else %}No{% endif %}</li>
+        </ul>
+    </div>
+    <form method="post">
+        <!-- Selezione della macchina dove andrà il materiale -->
+        <div class="mb-3">
+            <label for="macchina_id" class="form-label">Macchina</label>
+            <select id="macchina_id" name="macchina_id" class="form-select">
+                <option value="">-- Seleziona macchina --</option>
+                {% for m in macchine %}
+                    <option value="{{ m['id'] }}">{{ m['nome'] }}</option>
+                {% endfor %}
+            </select>
+            <small class="form-text text-muted">Gestisci l'elenco delle macchine nella sezione dizionario macchine.</small>
+        </div>
+        <div class="mb-3">
+        <label for="due_time" class="form-label">Data e ora di scadenza</label>
+        <input type="datetime-local" class="form-control" id="due_time" name="due_time" required>
+    </div>
+    {# Se la lastra è figlia di un bancale offriamo la possibilità di scegliere tra ID generico e specifico.  Con ID generico si potrà scansionare qualsiasi lastra del bancale per soddisfare la prenotazione. #}
+    {% if materiale['parent_id'] %}
+    <div class="mb-3">
+        <label for="id_mode" class="form-label">Tipo di prenotazione</label>
+        <select id="id_mode" name="id_mode" class="form-select">
+            <option value="specific">ID Specifico</option>
+            <option value="generic">ID Generico</option>
+        </select>
+        <small class="form-text text-muted">Con ID generico potrai prelevare qualsiasi lastra del bancale per soddisfare la prenotazione.</small>
+    </div>
+    {% endif %}
+    <button type="submit" class="btn btn-primary">Prenota</button>
+    <a href="{{ url_for('dettaglio', material_id=materiale['id']) }}" class="btn btn-secondary">Annulla</a>
+    </form>
+</div>
+{% endblock %}

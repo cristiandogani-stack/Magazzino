@@ -1,0 +1,93 @@
+Gestione Magazzino - Istruzioni rapide
+======================================
+
+Questa cartella contiene una webapp di magazzino pronta all'uso.
+L'applicazione consente di gestire in modo semplice e intuitivo i
+materiali presenti nel tuo magazzino: potrai aggiungere, cercare,
+filtrare, modificare e rimuovere i materiali, generare ed esportare un
+CSV dell'inventario e utilizzare i codici QR per una rapida
+identificazione e rimozione tramite scansione anche da smartphone.
+
+Prerequisiti
+------------
+
+* **Python 3.9** o superiore installato sul tuo computer. Puoi
+  scaricarlo da [python.org](https://www.python.org/downloads/) se non
+  presente.
+* Accesso a Internet per scaricare le dipendenze Python e le librerie
+  CDN utilizzate per lo stile e la scansione (Bootstrap e html5-qrcode).
+
+Installazione e avvio rapidi
+---------------------------
+
+1. Apri un terminale o prompt dei comandi nella cartella `magazzino-app`.
+2. Installa le dipendenze necessarie eseguendo:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+   Questo installerà **Flask** e **qrcode**.
+
+3. Avvia l'applicazione in modalità produzione con:
+
+   ```bash
+   python server.py
+   ```
+
+   Oppure su sistemi Linux/macOS:
+
+   ```bash
+   python3 server.py
+   ```
+
+   Questo utilizza il server WSGI `waitress` per servire
+   l'applicazione in modalità HTTP, più adatto a un uso continuativo
+   rispetto al server di sviluppo integrato in Flask.
+
+4. Una volta avviata, apri il tuo browser e naviga all'indirizzo:
+
+   `http://localhost:5000`
+
+   Se sei sulla stessa rete Wi‑Fi, puoi raggiungere l'app anche da un
+   altro dispositivo sostituendo *localhost* con l'indirizzo IP del
+   computer su cui è in esecuzione (es. `http://192.168.1.10:5000`).
+
+File utili per il lancio rapido
+-------------------------------
+
+All'interno di questa cartella trovi due script per avviare il server
+con un doppio click (o un tap):
+
+* **start_server.bat** – per Windows.  Esegue l'installazione delle
+  dipendenze (se necessario) e avvia il server utilizzando
+  ``server.py`` attraverso Waitress in modalità HTTP.  Non è più
+  necessario un certificato HTTPS: l'applicazione viene esposta su
+  ``http://0.0.0.0:5000``.
+
+* **start_server.sh** – per Linux/macOS.  Rendi eseguibile lo script con
+  `chmod +x start_server.sh` e poi eseguilo.  Lo script installerà le
+  dipendenze ed avvierà ``server.py`` tramite Waitress, sempre in
+  modalità HTTP.
+
+Principali funzionalità
+----------------------
+
+* **Dashboard** – Visualizza l’elenco dei materiali con ricerca e filtri
+  per ubicazione (lettera/numero). I badge colorati indicano lo stato
+  delle quantità (verde = abbondante, giallo = medio, rosso = scarsa).
+* **Aggiungi** – Inserisci nuovo materiale specificando tutti i dettagli,
+  incluso l’indice di ubicazione e note aggiuntive.
+* **Modifica** – Aggiorna in qualunque momento i dati di un materiale.
+* **Dettaglio** – Consulta tutte le informazioni di un materiale,
+  aggiorna rapidamente la quantità, scarica il QR code o elimina il
+  materiale.
+* **Scansione** – Rimuovi materiale in modo immediato scannerizzando il
+  QR code con la webcam del PC o la fotocamera del telefono.
+* **Export CSV** – Scarica un file `.csv` con l’inventario completo per
+  eventuali report o backup.
+
+Per ulteriori esigenze come storico movimenti, login utenti o avvisi
+sulle scorte minime, puoi ampliare il codice a piacere.
+
+Buon lavoro!

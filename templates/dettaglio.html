@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-lg">
+    {# Titolo rimosso per requisiti interfaccia #}
+    <div class="row">
+        <div class="col-md-7">
+            <ul class="list-group mb-3">
+                <li class="list-group-item"><strong>ID:</strong> {{ materiale['id'] }}</li>
+                <li class="list-group-item"><strong>Tipo:</strong> {{ materiale['tipo'] if materiale['tipo'] else '--' }}</li>
+                <li class="list-group-item"><strong>Materiale:</strong> {{ materiale['materiale'] }}</li>
+                {% if not materiale['is_pallet'] %}
+                <li class="list-group-item"><strong>Dimensioni:</strong> {% if materiale['dimensione_x'] or materiale['dimensione_y'] %}{{ materiale['dimensione_x'] if materiale['dimensione_x'] else '--' }} x {{ materiale['dimensione_y'] if materiale['dimensione_y'] else '--' }}{% else %}--{% endif %}</li>
+                {% endif %}
+                <li class="list-group-item"><strong>Spessore:</strong> {{ materiale['spessore'] if materiale['spessore'] else '--' }}</li>
+                <li class="list-group-item"><strong>Quantità:</strong> {{ materiale['quantita'] }}</li>
+                <li class="list-group-item"><strong>Ubicazione:</strong> {{ materiale['ubicazione_lettera'] }}-{{ materiale['ubicazione_numero'] }}</li>
+                <li class="list-group-item"><strong>Fornitore:</strong> {{ materiale['fornitore'] if materiale['fornitore'] else '--' }}</li>
+                <li class="list-group-item"><strong>Produttore:</strong> {{ materiale['produttore'] if materiale['produttore'] else '--' }}</li>
+                <li class="list-group-item"><strong>Sfrido:</strong> {% if materiale['is_sfrido'] %}<span class="sfrido-dot">●</span>{% else %}No{% endif %}</li>
+                {# Campo note editabile direttamente nel dettaglio.  L'input viene
+                   racchiuso in un form che, alla pressione di Invio,
+                   invia la richiesta di aggiornamento al server. #}
+                <li class="list-group-item">
+                    <form method="post" action="{{ url_for('update_note', material_id=materiale['id']) }}" class="d-flex align-items-center gap-2 mb-0">
+                        <strong>Note:</strong>
+                        <input type="text" name="note" value="{{ materiale['note'] if materiale['note'] else '' }}" class="form-control form-control-sm" placeholder="--" onkeydown="if(event.key === 'Enter'){ this.form.submit(); return false; }">
+                    </form>
+                </li>
+                {% if materiale['parent_id'] %}
+                <li class="list-group-item"><strong>Bancale ID:</strong> {{ materiale['parent_id'] }}</li>
+                {% endif %}
+            </ul>
+            {% if not materiale['is_pallet'] %}
+            {#
+              Il form di aggiornamento della quantità è stato rimosso su richiesta.
+              In precedenza, qui veniva mostrato un campo numerico con il pulsante
+              "Aggiorna quantità" per modificare il valore di "quantita" delle
+              lastre indipendenti o dei bancali. Questa funzionalità non è più
+              disponibile nell'interfaccia del dettaglio.
+            #}
+            {% endif %}
+            {#
+              Pulsante di eliminazione per bancali/lastre.  L'eliminazione è
+              consentita solo agli utenti che dispongono dell'accesso alla
+              scheda "Anagrafiche articoli" (chiave "config").  In
+              aggiunta, per i bancali resta la limitazione originaria che
+              richiede anche il permesso "accessi" (scheda Admin) per
+              procedere.  Per gli utenti che non hanno la scheda
+              "config" il pulsante di eliminazione non viene mostrato.  La
+              variabile ``allow_delete_pallet`` viene calcolata in base al
+              contenuto della sessione.
+            #}
+            {% set allowed_tabs = session.get('allowed_tabs', []) %}
+            {% if 'config' in allowed_tabs %}
+                {% set allow_delete_pallet = 'accessi' in allowed_tabs %}
+                <form method="post" action="{{ url_for('remove_material') }}" onsubmit="return confirm('Sicuro di rimuovere il materiale?');">
+                    <input type="hidden" name="material_id" value="{{ materiale['id'] }}">
+                    {% if materiale['is_pallet'] %}
+                    <button class="btn btn-danger mt-3" type="submit" {% if not allow_delete_pallet %}disabled{% endif %}>Elimina bancale</button>
+                    {% else %}
+                    <button class="btn btn-danger mt-3" type="submit">Elimina lastra</button>
+                    {% endif %}
+                </form>
+            {% endif %}
+            {# Mostra il pulsante "Aggiungi lastra" per tutti i materiali radice (bancali o lastre indipendenti).
+               Se il materiale è figlio (ha un parent_id) non consentiamo l'aggiunta di ulteriori lastre. #}
+            {% if not materiale['parent_id'] %}
+            <a class="btn btn-success mt-3" href="{{ url_for('add') }}?parent_id={{ materiale['id'] }}">Aggiungi lastra</a>
+            {% endif %}
+            <a class="btn btn-secondary mt-3" href="{{ url_for('dashboard') }}">Indietro</a>
+            <!-- Pulsante per visualizzare e caricare i documenti associati a questo materiale -->
+            <button type="button" class="btn btn-info mt-3" data-bs-toggle="modal" data-bs-target="#docsModal">
+                Docs{% if attachments %} ({{ attachments|length }}){% else %}{% endif %}
+            </button>
+        </div>
+        <div class="col-md-5 text-center">
+            <!-- Ubicazione grande centrata sopra il QR -->
+            <div class="mb-2 text-center">
+                <span style="display:block; width:180px; font-size:2.5rem; font-weight:700; margin:0 auto;">{{ materiale['ubicazione_lettera'] }}-{{ materiale['ubicazione_numero'] }}</span>
+            </div>
+            <!-- Visualizza sempre il QR code, anche per i bancali.  Se il record è
+                 un bancale, la scansione permetterà comunque di gestire le lastre
+                 associate. -->
+            <div class="qr-detail">
+                <img src="{{ url_for('qr_code', material_id=materiale['id']) }}" class="qr-img mt-3" width="180" alt="QR">
+                <p class="mt-2 mb-1">ID {{ materiale['id'] }} – {{ materiale['ubicazione_lettera'] }}-{{ materiale['ubicazione_numero'] }}</p>
+                <div class="d-grid gap-2">
+                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('qr_code', material_id=materiale['id']) }}" download="qr_materiale_{{ materiale['id'] }}.png">Scarica PNG</a>
+                    {# Pulsante di stampa: invia direttamente l'etichetta alla stampante Zebra #}
+                    <button class="btn btn-sm btn-outline-secondary" type="button" onclick="window.location.href='{{ url_for('print_label', material_id=materiale['id']) }}';">Stampa</button>
+                </div>
+            </div>
+            {# Pulsante Modifica dati nascosto su richiesta #}
+        </div>
+    </div>
+    {% if materiale['is_pallet'] and children %}
+    <!-- Elenco delle lastre figlie del bancale -->
+    <h3 class="mt-4">Lastre del bancale</h3>
+
+    {# Pulsante per stampare tutte le etichette delle lastre del bancale.  
+       Mostrato solo se il materiale è un bancale e sono presenti figli.  
+       Alla pressione chiede conferma e, se accettato, richiama l'endpoint
+       ``print_labels`` con l'elenco degli ID dei figli separati da virgola. #}
+    <div class="d-flex justify-content-end mb-2">
+        <button class="btn btn-success" type="button" onclick="if (confirm('Vuoi stampare tutte le etichette delle lastre di questo bancale?')) { window.location.href='{{ url_for('print_labels') }}?ids={{ child_ids_str }}'; }">Stampa tutti</button>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Materiale</th>
+                    <th>Dim X</th>
+                    <th>Dim Y</th>
+                    <th>Spessore</th>
+                    <th>Sfrido</th>
+                    <th>QR</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for child in children %}
+                <tr {% if highlight_id and child['id'] == highlight_id %}class="table-warning highlight-row"{% endif %}>
+                    <td>{{ child['id'] }}</td>
+                    <td>{{ child['materiale'] }}</td>
+                    <td>{{ child['dimensione_x'] if child['dimensione_x'] else '--' }}</td>
+                    <td>{{ child['dimensione_y'] if child['dimensione_y'] else '--' }}</td>
+                    <td>{{ child['spessore'] if child['spessore'] else '--' }}</td>
+                    <td class="text-center">
+                        {% if child['is_sfrido'] %}<span class="sfrido-dot">●</span>{% else %}&mdash;{% endif %}
+                    </td>
+                    <td>
+                        <div class="qr-cell text-center">
+                            <img class="qr-img mb-1" src="{{ url_for('qr_code', material_id=child['id']) }}" alt="QR" width="96">
+                            <div class="small">ID {{ child['id'] }}</div>
+                            {# Pulsante di stampa per la singola lastra figlia #}
+                            <button class="btn btn-sm btn-outline-secondary mt-1" type="button" onclick="window.location.href='{{ url_for('print_label', material_id=child['id']) }}';">Stampa</button>
+                        </div>
+                    </td>
+                    <td class=" align-middle">
+                        <!-- Pulsanti azione per le lastre figlie: manteniamo la dimensione piccola e li allineiamo orizzontalmente tramite btn-group -->
+                        <div class="d-flex align-items-center gap-1 flex-wrap" role="group">
+                            <a class="btn btn-sm btn-secondary" href="{{ url_for('dettaglio', material_id=child['id']) }}">Dettaglio</a>
+                            {%- if reserved_ids and child['id'] in reserved_ids -%}
+                            <span class="btn btn-sm btn-secondary disabled" aria-disabled="true">Prenotata</span>
+                            {%- else -%}
+                            <a class="btn btn-sm btn-warning" href="{{ url_for('prenota', material_id=child['id']) }}">Prenota</a>
+                            {%- endif -%}
+                            {# Mostra il pulsante di eliminazione della lastra figlia solo agli utenti
+                               che dispongono della scheda "Anagrafiche articoli" (config).  In
+                               assenza di questo permesso l'opzione di eliminazione viene
+                               completamente nascosta. #}
+                            {% if 'config' in session.get('allowed_tabs', []) %}
+                            <form method="post" action="{{ url_for('remove_material') }}" style="display:inline;margin:0;padding:0;" onsubmit="return confirm('Rimuovere questa lastra?');">
+                                <input type="hidden" name="material_id" value="{{ child['id'] }}">
+                                <button class="btn btn-sm btn-danger" type="submit">Elimina</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+    <!-- Modal per la gestione dei documenti della lastra/bancale -->
+    <div class="modal fade" id="docsModal" tabindex="-1" aria-labelledby="docsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="docsModalLabel">Documenti materiale ID {{ materiale['id'] }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    {% if attachments %}
+                        <ul class="list-group mb-3">
+                            {% for d in attachments %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <a href="{{ url_for('download_doc', doc_id=d['id']) }}" target="_blank">{{ d['original_name'] }}</a>
+                                    </div>
+                                    <form method="post" action="{{ url_for('delete_doc', doc_id=d['id']) }}" onsubmit="return confirm('Eliminare questo documento?');" class="ms-3">
+                                        <button class="btn btn-sm btn-danger" type="submit">Elimina</button>
+                                    </form>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p>Nessun documento caricato.</p>
+                    {% endif %}
+                    <!-- Form di caricamento documenti con supporto per scattare foto -->
+                    <form id="docForm" method="post" action="{{ url_for('upload_docs', material_id=materiale['id']) }}" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="docsFile" class="form-label">Carica documenti (PNG, JPG, JPEG, PDF)</label>
+                            <input class="form-control mb-2" type="file" id="docsFile" name="documents" multiple accept="image/*,.pdf">
+                            <input
+                                class="form-control"
+                                type="file"
+                                id="cameraFile"
+                                name="documents"
+                                accept="image/*"
+                                capture="environment"
+                                onchange="document.getElementById('docForm').submit();"
+                                style="position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;"
+                            >
+                            <div class="d-flex gap-2 mt-2">
+                                <label for="cameraFile" class="btn btn-secondary mb-0">Scatta foto</label>
+                                <button type="submit" class="btn btn-primary">Carica</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Se è stato passato un ``highlight_id`` dal server, esegui uno
+       script che rimuove la classe di evidenziazione dopo alcuni
+       secondi.  La classe ``table-warning`` proviene da Bootstrap e
+       colora lo sfondo della riga.  Dopo 3 secondi l'effetto viene
+       rimosso automaticamente. #}
+    {% if highlight_id %}
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const row = document.querySelector('.highlight-row');
+        if (row) {
+            setTimeout(function() {
+                row.classList.remove('table-warning');
+            }, 3000);
+        }
+    });
+    </script>
+    {% endif %}
+
+{% endblock %}

@@ -1,0 +1,1033 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-lg">
+<h2>Da gestire</h2>
+    <p class="mb-3">Articoli sotto soglia da ordinare.</p>
+    {% if not materiali %}
+        <div class="alert alert-info">Non ci sono materiali da riordinare al momento.</div>
+    {% else %}
+    <div class="table-responsive">
+        <!-- Form di riordino multiplo -->
+        <!-- Modificato l'attributo action affinché il pulsante "Prepara Ordine" rediriga
+             alla pagina di composizione dell'email (/prepara_ordine) invece di
+             creare direttamente una RDO.  In questo modo l'utente può vedere e
+             confermare l'email prima che l'ordine venga registrato e inviato. -->
+        <form id="prepara-ordine-form" method="POST" action="{{ url_for('prepara_ordine') }}" class="mb-3">
+            <div class="row row-cols-auto g-2 align-items-end">
+                <div class="col">
+                    <label for="fornitore_ids" class="form-label mb-0">Fornitori</label>
+                    <!-- Custom multi-select UI for suppliers -->
+                    <div class="supplier-tags mb-2"></div>
+                    <div class="supplier-combobox position-relative">
+                        <input type="text" class="form-control form-control-sm supplier-search" placeholder="Cerca fornitore e seleziona..." autocomplete="off">
+                        <div class="supplier-dropdown shadow-sm border rounded py-2 px-2 mt-1 bg-body-tertiary d-none" style="max-height: 220px; overflow:auto;">
+                            {% for f in fornitori %}
+                            <label class="d-flex align-items-center gap-2 py-1 supplier-option">
+                                <input type="checkbox" class="form-check-input supplier-check" value="{{ f['id'] }}">
+                                <span class="small">{{ f['nome'] }}{% if f['email'] %} ({{ f['email'] }}){% endif %}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <!-- Hidden select to hold values for the backend -->
+                    <select name="fornitore_ids" id="fornitore_ids" class="d-none" multiple>
+                        {% for f in fornitori %}
+                            <option value="{{ f['id'] }}">{{ f['nome'] }}{% if f['email'] %} ({{ f['email'] }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-text text-muted">Seleziona almeno un fornitore per poter preparare l'ordine.</small>
+                </div>
+
+                {#
+                    La selezione dei produttori è stata rimossa dalla pagina di riordini.
+                    Ogni combinazione di articolo include già il produttore associato
+                    nelle anagrafiche, pertanto non è più necessario scegliere i
+                    produttori manualmente qui.  Le righe dell'ordine verranno
+                    costruite utilizzando le combinazioni (materiale, tipo,
+                    spessore, dimensione X, dimensione Y, produttore) definite
+                    nell'anagrafica articoli.
+                #}
+            </div>
+            <!-- Contenitore per inputs dinamici dei materiali selezionati -->
+            <div id="selected-items-container"></div>
+        <!-- The form will close after the table; do not close it here -->
+        <table class="table table-striped table-hover align-middle">
+            <thead>
+                <tr>
+                    <th class="text-nowrap"></th>
+                    <th class="text-center text-nowrap">Materiale</th>
+                    <th class="text-nowrap">Tipo</th>
+                    <th class="text-nowrap">Spessore</th>
+                    <th class="text-nowrap">Dim&nbsp;X</th>
+                    <th class="text-nowrap">Dim&nbsp;Y</th>
+                    <th class="text-nowrap">Produttore</th>
+                    <th class="text-nowrap">Q.tà&nbsp;totale</th>
+                    <th class="text-nowrap">Q.tà da ordinare</th>
+                    <!-- Rimosso colonna Azioni -->
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in materiali %}
+                <tr>
+                    <td class="text-center">
+                        <input type="checkbox" class="form-check-input select-riordino" 
+                               data-materiale="{{ r.materiale }}" 
+                               data-tipo="{{ r.tipo }}" 
+                               data-spessore="{{ r.spessore }}" 
+                               data-dimensione_x="{{ r.dimensione_x }}" 
+                               data-dimensione_y="{{ r.dimensione_y }}" 
+                               data-produttore="{{ r.produttore }}" 
+                               data-qty-id="qta-input-{{ loop.index0 }}">
+                    </td>
+                    <td>{{ r.materiale }}</td>
+                    <td>{{ r.tipo if r.tipo else '—' }}</td>
+                    <td>{{ r.spessore if r.spessore else '—' }}</td>
+                    <td>{{ r.dimensione_x if r.dimensione_x else '—' }}</td>
+                    <td>{{ r.dimensione_y if r.dimensione_y else '—' }}</td>
+                    <td>{{ r.produttore if r.produttore else '—' }}</td>
+                    <td>{{ r.quantita_totale }}</td>
+                    <td style="width: 10rem;">
+                        <input type="number" id="qta-input-{{ loop.index0 }}" class="form-control form-control-sm" min="1" value="{{ r.riordino_qty }}">
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <!-- Submit button moved below the table -->
+        <div class="d-flex justify-content-end mt-3">
+            <button type="submit" id="btn-prepara-ordine" class="btn btn-primary btn-sm" disabled>Prepara Ordine</button>
+        </div>
+        </form>
+    </div>
+    {% endif %}
+
+    {% if rdo_rows and rdo_rows|length > 0 %}
+    <h3 class="mt-5">RDO</h3>
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th class="text-nowrap">Data</th>
+                    <th class="text-nowrap">Materiale</th>
+                    <th class="text-nowrap">Tipo</th>
+                    <th class="text-nowrap">Spessore</th>
+                    <th class="text-nowrap">Dim&nbsp;X</th>
+                    <th class="text-nowrap">Dim&nbsp;Y</th>
+                    <th class="text-nowrap">Q.tà ordinata</th>
+                    <th class="text-nowrap">Fornitore</th>
+                    <th class="text-nowrap">Produttore</th>
+                    <th class="text-nowrap">Data prev.&nbsp;arrivo / Date multiple</th>
+                    <th class="text-nowrap">Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rdo_rows %}
+                <tr>
+                    <td>{{ r['data'].split(' ')[0] }}</td>
+                    <td>{{ r['materiale'] if r['materiale'] else '—' }}</td>
+                    <td>{{ r['tipo'] if r['tipo'] else '—' }}</td>
+                    <td>{{ r['spessore'] if r['spessore'] else '—' }}</td>
+                    <td>{{ r['dimensione_x'] if r['dimensione_x'] else '—' }}</td>
+                    <td>{{ r['dimensione_y'] if r['dimensione_y'] else '—' }}</td>
+                    <!-- Quantità ordinata con form dedicato -->
+                    <td><input type="number" name="quantita" class="form-control form-control-sm" min="1" value="{{ r['quantita'] }}" form="form-rdo-{{ r['id'] }}"></td>
+                    <td>
+                        <select name="fornitore_scelto" class="form-select form-select-sm" form="form-rdo-{{ r['id'] }}">
+                            <option value="" {% if not r['fornitore_scelto'] %}selected{% endif %}>—</option>
+                            {% for f in r['fornitori_list'] %}
+                            <option value="{{ f }}" {% if r['fornitore_scelto'] == f %}selected{% endif %}>{{ f }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    {#
+                        Colonna Produttore: visualizza una select per ciascuna data di consegna.
+                        Utilizziamo un contenitore ``multi-prods-container`` per mantenere
+                        l'allineamento verticale con le date.  Ogni select ha nome
+                        ``produttore_scelti[]`` cosicché il backend riceva un array di
+                        produttori (uno per ogni data).  La prima select viene
+                        pre‑selezionata con ``r['produttore_scelto']`` se presente;
+                        tutte le altre rimangono vuote.
+                    #}
+                    <td>
+                        <div class="multi-prods-container"
+                             data-form="form-rdo-{{ r['id'] }}"
+                             data-prods="{{ r['produttori_list']|join('||') }}">
+                            {% if r['multi_dates'] %}
+                                {% for md in r['multi_dates'] %}
+                                {% set selected_val = r['produttore_scelto'] if loop.first else '' %}
+                                <div class="mb-1 multi-prod-row">
+                                    <select name="produttore_scelti[]" class="form-select form-select-sm" form="form-rdo-{{ r['id'] }}">
+                                        <option value="" {% if not selected_val %}selected{% endif %}>—</option>
+                                        {% for p in r['produttori_list'] %}
+                                            <option value="{{ p }}" {% if selected_val == p %}selected{% endif %}>{{ p }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                {# Nessuna data multipla: crea un'unica select per il produttore #}
+                                {% set selected_val = r['produttore_scelto'] or '' %}
+                                <div class="mb-1 multi-prod-row">
+                                    <select name="produttore_scelti[]" class="form-select form-select-sm" form="form-rdo-{{ r['id'] }}">
+                                        <option value="" {% if not selected_val %}selected{% endif %}>—</option>
+                                        {% for p in r['produttori_list'] %}
+                                            <option value="{{ p }}" {% if selected_val == p %}selected{% endif %}>{{ p }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        {#
+                            Gestione date di consegna con quantità.  Ogni RDO
+                            contiene un contenitore di righe (multi-dates-container)
+                            dove ogni riga permette di selezionare una data
+                            prevista di consegna e la quantità relativa da
+                            consegnare in quella data.  La prima riga viene
+                            sempre mostrata e prepopolata con la data prevista
+                            (se presente) e con la quantità totale dell'ordine
+                            come valore iniziale, così che l'utente possa
+                            specificare subito quanta merce arriva nella prima
+                            consegna.  Se l'RDO è già stata suddivisa in più
+                            date, vengono mostrate tutte le righe esistenti
+                            utilizzando i dati salvati in ``r['multi_dates']``.
+                        #}
+                        <!--
+                            Multi-date and quantity input fields container with add button aligned to the right.
+
+                            The parent ``div`` uses Bootstrap's ``d-flex`` utility to place
+                            the dynamic date inputs and the "+" button on the same horizontal
+                            line.  ``align-items-start`` keeps the button aligned with the
+                            top of the date inputs while ``gap-1`` provides a small space
+                            between them.  The margin-top class (``mt-1``) originally on the
+                            button has been removed because vertical alignment is now handled
+                            by the flex container.  This structure ensures that the add
+                            button appears immediately to the right of the date fields,
+                            creating a linear, inline layout as requested.
+                        -->
+                        <div class="d-flex gap-1 align-items-start">
+                            <div class="multi-dates-container"
+                                 data-form="form-rdo-{{ r['id'] }}">
+                            {% if r['multi_dates'] %}
+                                {% for md in r['multi_dates'] %}
+                                <div class="d-flex gap-1 align-items-start mb-1 multi-date-row">
+                                    <input type="date" name="dates[]" class="form-control form-control-sm" value="{{ md['data_prevista'] }}" form="form-rdo-{{ r['id'] }}">
+                                    <input type="number" name="qtys[]" min="1" max="{{ r['quantita'] }}" class="form-control form-control-sm" style="max-width: 5rem;" value="{{ md['quantita'] }}" form="form-rdo-{{ r['id'] }}">
+                                    {% if not loop.first %}
+                                    <button type="button" class="btn btn-outline-danger btn-sm remove-date" title="Rimuovi questa data">×</button>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="d-flex gap-1 align-items-start mb-1 multi-date-row">
+                                    <input type="date" name="dates[]" class="form-control form-control-sm" value="{{ r['data_prevista'] if r['data_prevista'] else '' }}" form="form-rdo-{{ r['id'] }}">
+                                    <input type="number" name="qtys[]" min="1" max="{{ r['quantita'] }}" class="form-control form-control-sm" style="max-width: 5rem;" value="{{ r['quantita'] }}" form="form-rdo-{{ r['id'] }}">
+                                    {# Prima riga: nessun pulsante di rimozione per evitare di lasciare il contenitore vuoto #}
+                                </div>
+                            {% endif %}
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-add-date" data-form="form-rdo-{{ r['id'] }}">+</button>
+                        </div>
+                    </td>
+                    <td>
+                        <button type="submit" class="btn btn-success btn-sm" form="form-rdo-{{ r['id'] }}" onclick="return confirm('Confermare definitivamente la riga?');">Conferma</button>
+                        <!-- Form nascosto utilizzato dagli attributi form -->
+                        <form id="form-rdo-{{ r['id'] }}" method="POST" action="{{ url_for('confirm_rdo', rdo_id=r['id']) }}" class="d-none"></form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if accettazioni and accettazioni|length > 0 %}
+    <h3 class="mt-5">Accettazione</h3>
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th class="text-nowrap">Data</th>
+                    <th class="text-nowrap">N°Ordine</th>
+                    <th class="text-center text-nowrap">Materiale</th>
+                    <th class="text-nowrap">Tipo</th>
+                    <th class="text-nowrap">Spessore</th>
+                    <th class="text-nowrap">Dim&nbsp;X</th>
+                    <th class="text-nowrap">Dim&nbsp;Y</th>
+                    <th class="text-nowrap">Q.tà totale</th>
+                    <th class="text-nowrap">Q.tà ricevuta</th>
+                    <th class="text-nowrap">Data&nbsp;prevista</th>
+                    <th class="text-nowrap">Produttore</th>
+                    <th class="text-nowrap">Fornitore</th>
+                    <th class="text-nowrap">Stato</th>
+                    <th class="text-nowrap">Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in accettazioni %}
+                <tr>
+                    <td>{{ a.data.split(' ')[0] }}</td>
+                    <td>{{ a.numero_ordine if a.numero_ordine else '—' }}</td>
+                    <td>{{ a.materiale }}</td>
+                    <td>{{ a.tipo if a.tipo else '—' }}</td>
+                    <td>{{ a.spessore if a.spessore else '—' }}</td>
+                    <td>{{ a.dimensione_x if a.dimensione_x else '—' }}</td>
+                    <td>{{ a.dimensione_y if a.dimensione_y else '—' }}</td>
+                    <td>{{ a.quantita_totale }}</td>
+                    <td>{{ a.quantita_ricevuta }}</td>
+                    <td>{{ a.data_prevista if a.data_prevista else '—' }}</td>
+                    <td>
+                        {#
+                            Visualizza sempre il produttore scelto per questa consegna come testo.
+                            Non consentire la modifica del produttore in fase di accettazione.
+                            Si visualizza prima il produttore associato alla singola consegna
+                            (campo ``a.produttore``); se non presente si utilizza
+                            ``a.produttore_scelto`` proveniente dall'ordine.
+                        #}
+                        {% set prod_to_show = a.produttore if a.produttore else (a.produttore_scelto if a.produttore_scelto else None) %}
+                        {{ prod_to_show if prod_to_show else '—' }}
+                    </td>
+                    <td>
+                        {#
+                            Visualizza sempre il fornitore scelto (se presente) come testo non modificabile.
+                            Se il fornitore non è ancora stato scelto, ma l'elenco contiene un solo elemento,
+                            mostra direttamente quell'unico nome.  Solo nel caso in cui non vi sia ancora
+                            un fornitore selezionato e ci siano più opzioni disponibili, consenti la scelta
+                            tramite select.  In questo modo l'accettazione riprende correttamente
+                            il fornitore scelto nell'RDO e non permette più la modifica.
+                            Per gli ordini manuali (senza lista fornitori), se la colonna
+                            "fornitore" della riga di accettazione è valorizzata, visualizza
+                            tale valore.
+                        #}
+                        {% if a.fornitore_scelto %}
+                            {{ a.fornitore_scelto }}
+                        {% elif a.fornitori|length <= 1 %}
+                            {% if a.fornitori %}
+                                {{ a.fornitori[0] }}
+                            {% elif a.fornitore %}
+                                {{ a.fornitore }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        {% else %}
+                            <select class="form-select form-select-sm forn-select" data-order="{{ a.numero_ordine }}">
+                                <option value="" disabled selected>Seleziona...</option>
+                                {% for f in a.fornitori %}
+                                <option value="{{ f }}">{{ f }}</option>
+                                {% endfor %}
+                            </select>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>{{ a.quantita_ricevuta }}/{{ a.quantita_totale }} accettati</span>
+                            <!-- Ampia la barra di avanzamento su tutta la cella per rendere lo stato dell'ordine più visibile -->
+                            <div class="progress ms-2 flex-grow-1" style="width: 100%;">
+                                <div class="progress-bar" role="progressbar" style="width: {{ a.progress_pct }}%" aria-valuenow="{{ a.progress_pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <form class="d-flex flex-column flex-sm-row gap-2 align-items-start align-items-sm-center accept-form" method="POST" action="{{ url_for('accettazione_update', acc_id=a.id) }}">
+                            <div class="d-flex gap-1 align-items-center">
+                                <!-- Campo per inserire la quantità da accettare (parziale o totale) -->
+                                <input type="number" name="quantita" id="quantita-{{ loop.index0 }}" class="form-control form-control-sm" min="1" max="{{ a.residuo }}" value="{{ a.residuo }}" style="width: 6rem;" />
+                                <!-- Pulsante per impostare automaticamente il residuo nel campo quantità -->
+</div>
+                            <button type="submit" class="btn btn-primary btn-sm">Accetta</button>
+                            <small class="form-text text-muted">Residuo: {{ a.residuo }}</small>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <h3 class="mt-5">Storico ordini</h3>
+    <!-- Form di filtro e ricerca per lo storico -->
+    <form method="get" action="{{ url_for('riordini') }}" class="row row-cols-auto g-2 align-items-end mb-3">
+        <div class="col">
+            <label for="start_date" class="form-label mb-0">Da</label>
+            <input type="date" name="start_date" id="start_date" class="form-control form-control-sm" value="{{ start_date }}">
+        </div>
+        <div class="col">
+            <label for="end_date" class="form-label mb-0">A</label>
+            <input type="date" name="end_date" id="end_date" class="form-control form-control-sm" value="{{ end_date }}">
+        </div>
+        <div class="col">
+            <label for="materiale_filter" class="form-label mb-0">Materiale</label>
+            <select name="materiale_filter" id="materiale_filter" class="form-select form-select-sm">
+                <option value="">Tutti</option>
+                {% for m in distinct_materiali %}
+                    <option value="{{ m }}" {% if materiale_filter == m %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col">
+            <label for="tipo_filter" class="form-label mb-0">Tipo</label>
+            <select name="tipo_filter" id="tipo_filter" class="form-select form-select-sm">
+                <option value="">Tutti</option>
+                {% for t in distinct_tipi %}
+                    <option value="{{ t }}" {% if tipo_filter == t %}selected{% endif %}>{{ t }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col">
+            <label for="spessore_filter" class="form-label mb-0">Spessore</label>
+            <select name="spessore_filter" id="spessore_filter" class="form-select form-select-sm">
+                <option value="">Tutti</option>
+                {% for s in distinct_spessori %}
+                    <option value="{{ s }}" {% if spessore_filter == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col">
+            <label for="dx_filter" class="form-label mb-0">Dim&nbsp;X</label>
+            <select name="dx_filter" id="dx_filter" class="form-select form-select-sm">
+                <option value="">Tutte</option>
+                {% for x in distinct_dxs %}
+                    <option value="{{ x }}" {% if dx_filter == x %}selected{% endif %}>{{ x }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col">
+            <label for="dy_filter" class="form-label mb-0">Dim&nbsp;Y</label>
+            <select name="dy_filter" id="dy_filter" class="form-select form-select-sm">
+                <option value="">Tutte</option>
+                {% for y in distinct_dys %}
+                    <option value="{{ y }}" {% if dy_filter == y %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col">
+            <label for="evento_filter" class="form-label mb-0">Evento</label>
+            <select name="evento_filter" id="evento_filter" class="form-select form-select-sm">
+                <option value="">Tutti</option>
+                {% for ev in distinct_eventi %}
+                    <option value="{{ ev }}" {% if evento_filter == ev %}selected{% endif %}>{{ ev.capitalize() }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <!-- Filtro Produttore -->
+        <div class="col">
+            <label for="produttore_filter" class="form-label mb-0">Produttore</label>
+            <select name="produttore_filter" id="produttore_filter" class="form-select form-select-sm">
+                <option value="">Tutti</option>
+                {% for p in distinct_produttori %}
+                    <option value="{{ p }}" {% if produttore_filter == p %}selected{% endif %}>{{ p }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col">
+            <input type="hidden" name="page" value="1">
+            <button type="submit" class="btn btn-primary btn-sm">Filtra</button>
+        </div>
+        <div class="col">
+            <a href="{{ url_for('riordini') }}" class="btn btn-secondary btn-sm">Reset</a>
+        </div>
+    </form>
+    {% if history and history|length > 0 %}
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <!-- Colonna per pulsante di espansione padre-figlio nello storico -->
+                    <th style="width: 1.5rem;" class="text-nowrap"></th>
+                    <th class="text-nowrap">Data</th>
+                    <th class="text-nowrap">N°Ordine</th>
+                    <th class="text-nowrap">Fornitore</th>
+                    <th class="text-end text-nowrap">Q.tà ordinate</th>
+                    <th class="text-end text-nowrap">Q.tà accettate</th>
+                    <th class="text-center text-nowrap">Materiale</th>
+                    <th class="text-nowrap">Tipo</th>
+                    <th class="text-nowrap">Spessore</th>
+                    <th class="text-nowrap">Dim&nbsp;X</th>
+                    <th class="text-nowrap">Dim&nbsp;Y</th>
+                    <th class="text-nowrap">Produttore</th>
+                </tr>
+            </thead>
+            <tbody>
+                {#
+                    Visualizza lo storico ordini in una struttura gerarchica.  Ogni
+                    elemento di ``history_tree`` contiene un attributo ``parent``
+                    (che rappresenta una riga di tipo ``ordine``) e un elenco
+                    ``children`` con le relative accettazioni.  Se ``parent``
+                    è None la riga viene trattata come un record privo di ordine
+                    associato (ad esempio accettazioni visualizzate su una
+                    pagina diversa dalla conferma).  Per ciascun nodo stampiamo
+                    prima il genitore e successivamente i figli con un piccolo
+                    rientro per distinguerli visivamente.
+                #}
+                {% for node in history_tree %}
+                    {% set pid = loop.index0 %}
+                    {% if node.parent %}
+                        {% set r = node.parent %}
+                        {% set ns = namespace(acc_sum=0) %}
+                        {% for child in node.children %}{% set ns.acc_sum = ns.acc_sum + (child['quantita'] or 0) %}{% endfor %}
+
+                        <tr>
+                            <td class="text-center">
+                                {% if node.children|length > 0 %}
+                                    <button type="button" class="btn btn-link btn-sm toggle-children" data-target="children-{{ pid }}" style="text-decoration:none;">+</button>
+                                {% else %}
+                                    <!-- nessun figlio -->
+                                {% endif %}
+                            </td>
+                            <td>{{ r['data'] }}</td>
+                            <td>{{ r.get('numero_ordine') if r.get('numero_ordine') else '—' }}</td>
+                            <td>{{ r.get('fornitore') if r.get('fornitore') else '—' }}</td>
+                            <td class="text-end">{{ r['quantita'] }}</td>
+                            <td class="text-end">{{ ns.acc_sum }}</td>
+                            <td class="text-center">{{ r['materiale'] }}</td>
+                            <td>{{ r['tipo'] if r['tipo'] else '—' }}</td>
+                            <td>{{ r['spessore'] if r['spessore'] else '—' }}</td>
+                            <td>{{ r['dimensione_x'] if r['dimensione_x'] else '—' }}</td>
+                            <td>{{ r['dimensione_y'] if r['dimensione_y'] else '—' }}</td>
+                            <td>{{ r.get('produttore') if r.get('produttore') else '—' }}</td>
+                            {# Colonne confermato e accettato rimosse #}
+                        </tr>
+                    {% endif %}
+                    {% for child in node.children %}
+                        {# Righe figlie (accettazioni) con rientro #}
+                        <tr class="table-light children-{{ pid }} d-none">
+                            <td></td>
+                            <td>{{ child['data'] }}</td>
+                            <td>{{ child.get('numero_ordine') if child.get('numero_ordine') else '—' }}</td>
+                            <td>{{ child.get('fornitore') if child.get('fornitore') else '—' }}</td>
+                            <td class="text-end">—</td>
+                            <td class="text-end">{{ child['quantita'] }}</td>
+                            <td class="text-center">
+                                <span class="ms-3">{{ child['materiale'] }}</span>
+                            </td>
+                            <td>{{ child['tipo'] if child['tipo'] else '—' }}</td>
+                            <td>{{ child['spessore'] if child['spessore'] else '—' }}</td>
+                            <td>{{ child['dimensione_x'] if child['dimensione_x'] else '—' }}</td>
+                            <td>{{ child['dimensione_y'] if child['dimensione_y'] else '—' }}</td>
+                            <td>{{ child.get('produttore') if child.get('produttore') else '—' }}</td>
+                            {# Colonne confermato e accettato rimosse per righe figlie #}
+                        </tr>
+                    {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if total_pages and total_pages > 1 %}
+    <nav aria-label="Paginazione storico" class="mt-3">
+        <ul class="pagination pagination-sm">
+            {% for p in range(1, total_pages + 1) %}
+            <li class="page-item {% if p == current_page %}active{% endif %}">
+                <a class="page-link" href="{{ url_for('riordini', page=p, start_date=start_date, end_date=end_date, materiale_filter=materiale_filter, tipo_filter=tipo_filter, spessore_filter=spessore_filter, dx_filter=dx_filter, dy_filter=dy_filter, evento_filter=evento_filter, produttore_filter=produttore_filter) }}">{{ p }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+    </nav>
+    {% endif %}
+    {% else %}
+    <p class="text-muted">Nessun ordine trovato per i filtri selezionati.</p>
+    {% endif %}
+    <a class="btn btn-secondary mt-3" href="{{ url_for('dashboard') }}">Dashboard</a>
+</div>
+
+{# Script accetta residuo rimosso #}
+
+<!-- Script per gestire i checkbox di riordino e la preparazione dell'ordine -->
+<!-- Rimosso script originale di gestione checkbox, sostituito con nuova implementazione -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.toggle-children').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const target = this.getAttribute('data-target');
+            const rows = document.querySelectorAll('.' + target);
+            const isHidden = rows.length > 0 && rows[0].classList.contains('d-none');
+            rows.forEach(function(row) {
+                row.classList.toggle('d-none');
+            });
+            // Toggle symbol + / -
+            if (isHidden) {
+                this.textContent = '−';
+            } else {
+                this.textContent = '+';
+            }
+        });
+    });
+});
+</script>
+<script>
+// Gestione selezione fornitore da menu a discesa nell'elenco delle accettazioni
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.forn-select').forEach(function(sel) {
+        sel.addEventListener('change', function() {
+            const orderNum = this.getAttribute('data-order');
+            const selected = this.value;
+            if (!orderNum || !selected) {
+                return;
+            }
+            if (!confirm('Vuoi confermare il fornitore selezionato?')) {
+                this.selectedIndex = 0;
+                return;
+            }
+            fetch('{{ url_for("set_fornitore_ordine") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ numero_ordine: orderNum, fornitore: selected })
+            }).then(function(response) { return response.json(); }).then(function(data) {
+                if (data && data.success) {
+                    window.location.reload();
+                } else {
+                    alert(data.error || data.message || 'Errore durante il salvataggio');
+                    // Reset selection
+                    sel.selectedIndex = 0;
+                }
+            }).catch(function() {
+                alert('Errore di rete');
+                sel.selectedIndex = 0;
+            });
+        });
+    });
+    // Gestione selezione produttore da menu a discesa nell'elenco delle accettazioni
+    document.querySelectorAll('.prod-select').forEach(function(sel) {
+        sel.addEventListener('change', function() {
+            const selected = this.value;
+            if (!selected) {
+                return;
+            }
+            // Priorità: se è presente l'attributo data-acc-id, aggiorna la singola riga di accettazione.
+            const accId = this.getAttribute('data-acc-id');
+            const orderNum = this.getAttribute('data-order');
+            let confirmMsg = 'Vuoi confermare il produttore selezionato?';
+            if (!confirm(confirmMsg)) {
+                this.selectedIndex = 0;
+                return;
+            }
+            let url = null;
+            let payload = {};
+            if (accId) {
+                url = '{{ url_for("set_produttore_accettazione") }}';
+                payload = { acc_id: accId, produttore: selected };
+            } else if (orderNum) {
+                url = '{{ url_for("set_produttore_ordine") }}';
+                payload = { numero_ordine: orderNum, produttore: selected };
+            } else {
+                // Nessun identificatore, non procedere
+                return;
+            }
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            }).then(function(response) { return response.json(); }).then(function(data) {
+                if (data && data.success) {
+                    window.location.reload();
+                } else {
+                    alert(data.error || data.message || 'Errore durante il salvataggio');
+                    sel.selectedIndex = 0;
+                }
+            }).catch(function() {
+                alert('Errore di rete');
+                sel.selectedIndex = 0;
+            });
+        });
+    });
+});
+</script>
+<style>
+/* Styles for custom supplier multi-select */
+.supplier-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+}
+.supplier-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 1rem;
+    padding: .25rem .5rem;
+    font-size: .75rem;
+    background-color: var(--bs-secondary-bg);
+    border: 1px solid var(--bs-border-color);
+    color: var(--bs-body-color);
+}
+.supplier-chip .remove {
+    margin-left: .35rem;
+    cursor: pointer;
+    font-weight: bold;
+}
+.supplier-chip .remove:hover {
+    color: var(--bs-danger);
+}
+.supplier-dropdown {
+    z-index: 1000;
+}
+.supplier-dropdown .supplier-option:hover {
+    background-color: var(--bs-secondary-bg);
+}
+/* Styles for custom producer multi-select */
+.produttore-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+}
+.produttore-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 1rem;
+    padding: .25rem .5rem;
+    font-size: .75rem;
+    background-color: var(--bs-secondary-bg);
+    border: 1px solid var(--bs-border-color);
+    color: var(--bs-body-color);
+}
+.produttore-chip .remove {
+    margin-left: .35rem;
+    cursor: pointer;
+    font-weight: bold;
+}
+.produttore-chip .remove:hover {
+    color: var(--bs-danger);
+}
+.produttore-dropdown {
+    z-index: 1000;
+}
+.produttore-dropdown .produttore-option:hover {
+    background-color: var(--bs-secondary-bg);
+}
+</style>
+<script>
+(function(){
+    const root = document.currentScript.closest('div.container-lg') || document;
+    // Supplier multi-select logic
+    const hiddenSelect = root.querySelector('#fornitore_ids');
+    const search = root.querySelector('.supplier-search');
+    const dropdown = root.querySelector('.supplier-dropdown');
+    const tagsContainer = root.querySelector('.supplier-tags');
+    const checks = dropdown ? Array.from(dropdown.querySelectorAll('.supplier-check')) : [];
+    function renderTags() {
+        if (!tagsContainer || !hiddenSelect) return;
+        tagsContainer.innerHTML = '';
+        const selectedOptions = Array.from(hiddenSelect.options).filter(o => o.selected);
+        selectedOptions.forEach(opt => {
+            const chip = document.createElement('span');
+            chip.className = 'supplier-chip';
+            chip.textContent = opt.text;
+            const remove = document.createElement('span');
+            remove.className = 'remove';
+            remove.innerHTML = '&times;';
+            remove.title = 'Rimuovi';
+            remove.addEventListener('click', (e) => {
+                opt.selected = false;
+                const chk = checks.find(c => c.value === opt.value);
+                if (chk) chk.checked = false;
+                onSelectionChanged();
+                e.stopPropagation();
+            });
+            chip.appendChild(remove);
+            tagsContainer.appendChild(chip);
+        });
+    }
+    function onSelectionChanged() {
+        if (!hiddenSelect) return;
+        const selectedValues = new Set(checks.filter(c => c.checked).map(c => c.value));
+        Array.from(hiddenSelect.options).forEach(o => {
+            o.selected = selectedValues.has(o.value);
+        });
+        renderTags();
+        // Aggiorna lo stato del pulsante dopo ogni modifica alla selezione fornitori
+        if (typeof updateSubmitState === 'function') {
+            updateSubmitState();
+        }
+    }
+    if (search && dropdown) {
+        search.addEventListener('focus', () => {
+            dropdown.classList.remove('d-none');
+        });
+        search.addEventListener('input', () => {
+            const query = search.value.trim().toLowerCase();
+            dropdown.classList.remove('d-none');
+            checks.forEach(chk => {
+                const label = chk.closest('label');
+                const text = label.textContent.trim().toLowerCase();
+                if (text.includes(query)) {
+                    label.style.display = '';
+                } else {
+                    label.style.display = 'none';
+                }
+            });
+        });
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.supplier-combobox')) {
+                dropdown.classList.add('d-none');
+            }
+        });
+        checks.forEach(chk => {
+            chk.addEventListener('change', onSelectionChanged);
+        });
+        // Preselect from hidden select
+        const preselected = new Set(Array.from(hiddenSelect.options).filter(o => o.selected).map(o => o.value));
+        checks.forEach(chk => {
+            chk.checked = preselected.has(chk.value);
+        });
+        renderTags();
+    }
+    // Row selection logic
+    const selectedContainer = root.querySelector('#selected-items-container');
+    const checkboxInputs = Array.from(root.querySelectorAll('.select-riordino'));
+    function updateSelectedItems() {
+        if (!selectedContainer) return;
+        selectedContainer.innerHTML = '';
+        checkboxInputs.forEach(checkbox => {
+            if (checkbox.checked) {
+                const materiale = checkbox.dataset.materiale || '';
+                const tipo = checkbox.dataset.tipo || '';
+                const spessore = checkbox.dataset.spessore || '';
+                const dx = checkbox.dataset.dimensione_x || '';
+                const dy = checkbox.dataset.dimensione_y || '';
+                const produttore = checkbox.dataset.produttore || '';
+                const qtyInputId = checkbox.dataset.qtyId;
+                const qtyInput = qtyInputId ? document.getElementById(qtyInputId) : null;
+                const quantita = qtyInput ? qtyInput.value : '';
+                const fields = {
+                    'materiale': materiale,
+                    'tipo': tipo,
+                    'spessore': spessore,
+                    'dimensione_x': dx,
+                    'dimensione_y': dy,
+                    'produttore': produttore,
+                    'quantita': quantita
+                };
+                Object.entries(fields).forEach(([name, value]) => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = name;
+                    input.value = value;
+                    selectedContainer.appendChild(input);
+                });
+            }
+        });
+        updateSubmitState();
+    }
+    checkboxInputs.forEach(cb => {
+        cb.addEventListener('change', updateSelectedItems);
+    });
+    Array.from(root.querySelectorAll('input[id^="qta-input-"]')).forEach(inp => {
+        inp.addEventListener('input', updateSelectedItems);
+    });
+    const submitBtn = root.querySelector('#btn-prepara-ordine');
+    function updateSubmitState() {
+        if (!submitBtn) return;
+        const hasRows = selectedContainer && selectedContainer.querySelector('input[name="materiale"]');
+        // Verifica se è stato selezionato almeno un fornitore e almeno un produttore.
+        // Utilizziamo le select nascoste create dal widget multi-select per
+        // determinare se l'utente ha effettuato una scelta.
+        const supplierHiddenSelect = document.querySelector('#fornitore_ids');
+        const hasSuppliers = supplierHiddenSelect && Array.from(supplierHiddenSelect.options).some(o => o.selected);
+        // Abilita il pulsante solo se c'è almeno una riga selezionata e sono
+        // stati indicati almeno un fornitore.  Non è più necessario
+        // selezionare i produttori manualmente poiché vengono
+        // dedotti dall'anagrafica articoli.
+        submitBtn.disabled = !(hasRows && hasSuppliers);
+    }
+    // Espone la funzione a livello globale per l'uso in altri script
+    window.updateSubmitState = updateSubmitState;
+    updateSelectedItems();
+})();
+
+// Gestisce il pulsante "+" per aggiungere date multiple nella sezione RDO.
+// Quando l'utente clicca sul pulsante, viene aggiunta una nuova riga con un
+// campo data e un campo quantità.  Tutti gli input generati sono
+// associati al form tramite l'attributo ``form`` e avranno nomi
+// ``dates[]`` e ``qtys[]`` così che il backend possa leggerli come liste.
+document.addEventListener('DOMContentLoaded', function() {
+    // Gestione del pulsante "+" per aggiungere una nuova data di consegna.
+    const addButtons = document.querySelectorAll('.btn-add-date');
+    addButtons.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const formId = this.getAttribute('data-form');
+            if (!formId) return;
+            const container = document.querySelector('.multi-dates-container[data-form="' + formId + '"]');
+            const prodContainer = document.querySelector('.multi-prods-container[data-form="' + formId + '"]');
+            if (!container) return;
+            // Crea una nuova riga per data e quantità
+            const rowDiv = document.createElement('div');
+            rowDiv.className = 'd-flex gap-1 align-items-start mb-1 multi-date-row';
+            // Campo data
+            const dateInput = document.createElement('input');
+            dateInput.type = 'date';
+            dateInput.name = 'dates[]';
+            dateInput.className = 'form-control form-control-sm';
+            dateInput.setAttribute('form', formId);
+            // Campo quantità
+            const qtyInput = document.createElement('input');
+            qtyInput.type = 'number';
+            qtyInput.name = 'qtys[]';
+            qtyInput.min = '1';
+            qtyInput.className = 'form-control form-control-sm';
+            qtyInput.style.maxWidth = '5rem';
+            qtyInput.setAttribute('form', formId);
+            // Pulsante di rimozione
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn btn-outline-danger btn-sm remove-date';
+            removeBtn.textContent = '×';
+            removeBtn.title = 'Rimuovi questa data';
+            removeBtn.addEventListener('click', function() {
+                // Se rimane solo una riga, non eliminarla, ma svuota i campi e resetta il produttore
+                if (container.children.length <= 1) {
+                    dateInput.value = '';
+                    qtyInput.value = '';
+                    if (prodContainer) {
+                        const firstSelect = prodContainer.querySelector('select');
+                        if (firstSelect) firstSelect.selectedIndex = 0;
+                    }
+                } else {
+                    // determina l'indice della riga da rimuovere
+                    const rows = Array.from(container.children);
+                    const idx = rows.indexOf(rowDiv);
+                    rowDiv.remove();
+                    // rimuovi il corrispondente selettore produttore
+                    if (prodContainer) {
+                        const prodRows = Array.from(prodContainer.children);
+                        if (idx >= 0 && idx < prodRows.length) {
+                            prodRows[idx].remove();
+                        } else if (prodRows.length > 0) {
+                            prodRows[prodRows.length - 1].remove();
+                        }
+                    }
+                }
+            });
+            // Assembla la riga
+            rowDiv.appendChild(dateInput);
+            rowDiv.appendChild(qtyInput);
+            rowDiv.appendChild(removeBtn);
+            container.appendChild(rowDiv);
+            // Crea la riga per il produttore e aggiungila al contenitore dei produttori
+            if (prodContainer) {
+                const prodRow = document.createElement('div');
+                prodRow.className = 'mb-1 multi-prod-row';
+                const select = document.createElement('select');
+                select.name = 'produttore_scelti[]';
+                select.className = 'form-select form-select-sm';
+                select.setAttribute('form', formId);
+                // opzione vuota
+                const emptyOpt = document.createElement('option');
+                emptyOpt.value = '';
+                emptyOpt.selected = true;
+                emptyOpt.textContent = '—';
+                select.appendChild(emptyOpt);
+                // recupera lista produttori
+                let prodList = [];
+                const prodStr = prodContainer.getAttribute('data-prods') || '';
+                if (prodStr) {
+                    prodList = prodStr.split('||');
+                }
+                prodList.forEach(function(p) {
+                    const opt = document.createElement('option');
+                    opt.value = p;
+                    opt.textContent = p;
+                    select.appendChild(opt);
+                });
+                prodRow.appendChild(select);
+                prodContainer.appendChild(prodRow);
+            }
+        });
+    });
+    // Associa l'evento di rimozione alle righe preesistenti (quelle renderizzate dal server)
+    document.querySelectorAll('.multi-dates-container').forEach(function(container) {
+        const rows = container.querySelectorAll('.multi-date-row');
+        rows.forEach(function(row, idx) {
+            const removeBtn = row.querySelector('.remove-date');
+            if (removeBtn) {
+                removeBtn.addEventListener('click', function() {
+                    const formId = container.getAttribute('data-form');
+                    const prodContainer = document.querySelector('.multi-prods-container[data-form="' + formId + '"]');
+                    if (container.children.length <= 1) {
+                        // Se rimane solo una riga, svuota tutti gli input e resetta la prima select dei produttori
+                        const inputs = row.querySelectorAll('input');
+                        inputs.forEach(function(inp) { inp.value = ''; });
+                        if (prodContainer) {
+                            const firstSel = prodContainer.querySelector('select');
+                            if (firstSel) firstSel.selectedIndex = 0;
+                        }
+                    } else {
+                        // Rimuovi la riga di data e la corrispondente riga di produttore
+                        const dateRows = Array.from(container.children);
+                        const idxToRemove = dateRows.indexOf(row);
+                        row.remove();
+                        if (prodContainer) {
+                            const prodRows = Array.from(prodContainer.children);
+                            if (idxToRemove >= 0 && idxToRemove < prodRows.length) {
+                                prodRows[idxToRemove].remove();
+                            } else if (prodRows.length > 0) {
+                                prodRows[prodRows.length - 1].remove();
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    });
+});
+</script>
+<!-- Script per validare la conferma delle RDO: disabilita la conferma se mancano dati -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Seleziona tutti i pulsanti di conferma associati ai form RDO
+  document.querySelectorAll('button.btn.btn-success.btn-sm[form^="form-rdo-"]').forEach(function(btn) {
+    // Rimuovi eventuale attributo onclick originale per evitare doppie conferme
+    if (btn.hasAttribute('onclick')) {
+      btn.removeAttribute('onclick');
+    }
+    btn.addEventListener('click', function(event) {
+      const formId = this.getAttribute('form');
+      if (!formId) return;
+      const formElem = document.getElementById(formId);
+      if (!formElem) return;
+      // Trova la riga della tabella che contiene il pulsante
+      const row = this.closest('tr');
+      if (!row) return;
+      const qtyInput = row.querySelector('input[name="quantita"]');
+      const fornSelect = row.querySelector('select[name="fornitore_scelto"]');
+      // Determina se è stata inserita almeno una data
+      const multiContainer = document.querySelector('.multi-dates-container[data-form="' + formId + '"]');
+      let hasDate = false;
+      if (multiContainer) {
+        multiContainer.querySelectorAll('input[type="date"]').forEach(function(dt){
+          if (dt.value && dt.value.trim() !== '') { hasDate = true; }
+        });
+      }
+      const qtyVal = qtyInput && qtyInput.value ? parseInt(qtyInput.value) : 0;
+      const fornVal = fornSelect ? fornSelect.value : '';
+      // Non c'è più una selezione di produttori: verifica solo la quantità,
+      // il fornitore e almeno una data prevista.
+      if (!qtyVal || qtyVal <= 0 || !fornVal || !hasDate) {
+        // Avvisa l'utente e blocca l'invio del form
+        alert('Compila tutti i campi, inclusi fornitore e data prevista, prima di confermare.');
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return false;
+      }
+      // Se tutti i campi sono validi, chiedi conferma finale
+      if (!confirm('Confermare definitivamente la riga?')) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return false;
+      }
+      // Lascia procedere l'invio del form
+      return true;
+    });
+  });
+});
+</script>
+{# Rimosso script per la gestione del multi-select dei produttori, poiché la
+   scelta del produttore è ora determinata automaticamente dalle anagrafiche.
+#}
+{# Highlighting disabled: per richiesta dell'utente non
+   evidenziamo più le righe nella pagina dei riordini.  Il blocco
+   precedente che illuminava e scrollava la riga è stato rimosso. #}
+{% endblock %}

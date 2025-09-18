@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-lg">
+    <h2>Gestione dizionario fornitori</h2>
+    <p class="text-muted">Aggiungi o rimuovi i fornitori disponibili per l'inserimento e i filtri del magazzino.</p>
+    <!-- Form per aggiungere un nuovo fornitore -->
+    <form method="POST" class="row gx-2 gy-2 align-items-center mb-4">
+        <div class="col-sm-8 col-12">
+            <input type="text" name="nome" class="form-control" placeholder="Nuovo fornitore..." required>
+        </div>
+        <div class="col-sm-4 col-12">
+            <button type="submit" class="btn btn-primary w-100">Aggiungi</button>
+        </div>
+    </form>
+    <!-- Tabella dei fornitori esistenti -->
+    <div class="table-responsive">
+        <table class="table table-striped align-middle text-center anagrafiche-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Fornitore</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for f in suppliers %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ f['nome'] }}</td>
+                    <td class="text-nowrap">
+                        <!-- Pulsante per modificare il fornitore: apre un modal -->
+                        <button type="button" class="btn btn-sm btn-secondary me-1" data-bs-toggle="modal" data-bs-target="#editForn-{{ f['id'] }}">Modifica</button>
+                        <form method="POST" action="{{ url_for('delete_fornitore_vocab', fornitore_id=f['id']) }}" onsubmit="return confirm('Sei sicuro di voler eliminare questo fornitore dal dizionario?');" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-danger">Elimina</button>
+                        </form>
+                        <!-- Modal modifica fornitore -->
+                        <div class="modal fade" id="editForn-{{ f['id'] }}" tabindex="-1" aria-labelledby="editFornLabel-{{ f['id'] }}" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <form method="POST" action="{{ url_for('update_fornitore', fornitore_id=f['id']) }}">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="editFornLabel-{{ f['id'] }}">Modifica fornitore</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="mb-3">
+                                                <label for="editNome-{{ f['id'] }}" class="form-label">Nome</label>
+                                                <input type="text" class="form-control" id="editNome-{{ f['id'] }}" name="nome" value="{{ f['nome'] }}" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="editEmail-{{ f['id'] }}" class="form-label">Email (opzionale)</label>
+                                                <input type="email" class="form-control" id="editEmail-{{ f['id'] }}" name="email" value="{{ f['email'] if f['email'] else '' }}">
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                                            <button type="submit" class="btn btn-primary">Salva</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="3" class="text-center">Nessun fornitore presente nel dizionario.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {# <a href="{{ url_for('dashboard') }}" class="btn btn-secondary mt-3">Torna alla dashboard</a> #}
+</div>
+{% endblock %}

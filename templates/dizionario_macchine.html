@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-lg">
+    <h2>Gestione dizionario macchine</h2>
+    <p class="text-muted">Aggiungi o rimuovi le macchine disponibili per l'assegnazione nelle prenotazioni.</p>
+    <!-- Form per aggiungere una nuova macchina -->
+    <form method="POST" class="row gx-2 gy-2 align-items-center mb-4">
+        <div class="col-sm-8 col-12">
+            <input type="text" name="nome" class="form-control" placeholder="Nuova macchina..." required>
+        </div>
+        <div class="col-sm-4 col-12">
+            <button type="submit" class="btn btn-primary w-100">Aggiungi</button>
+        </div>
+    </form>
+    <!-- Tabella delle macchine esistenti -->
+    <div class="table-responsive">
+        <table class="table table-striped align-middle text-center anagrafiche-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Macchina</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for m in macchine %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ m['nome'] }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('delete_macchina_vocab', macchina_id=m['id']) }}" onsubmit="return confirm('Sei sicuro di voler eliminare questa macchina dal dizionario?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Elimina</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="3" class="text-center">Nessuna macchina presente nel dizionario.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {# <a href="{{ url_for('dashboard') }}" class="btn btn-secondary mt-3">Torna alla dashboard</a> #}
+</div>
+{% endblock %}

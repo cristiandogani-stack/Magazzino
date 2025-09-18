@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-lg">
+    <h2>Modifica materiale</h2>
+    <!-- Mostra il tipo di record (bancale/lastra) e il legame con eventuale padre -->
+    <p>
+        <strong>Tipo:</strong>
+        {% if materiale['is_pallet'] %}Bancale{% elif materiale['parent_id'] %}Lastra{% else %}Lastra indipendente{% endif %}
+        {% if materiale['parent_id'] %}
+            (Bancale ID {{ materiale['parent_id'] }})
+        {% endif %}
+    </p>
+    <form method="POST">
+        <div class="row">
+            <!-- Selezione del materiale dal dizionario -->
+            <div class="col-md-4 mb-3">
+                <div class="d-flex justify-content-between align-items-baseline">
+                    <label class="form-label mb-0">Materiale *</label>
+                    <a href="{{ url_for('dizionario') }}" class="small text-decoration-none">Gestisci dizionario</a>
+                </div>
+                <select name="materiale" class="form-select" required>
+                    {% for mat in materiali_list %}
+                        <option value="{{ mat }}" {% if mat == materiale['materiale'] %}selected{% endif %}>{{ mat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <!-- Selezione del tipo di lavorazione (fresato, laminato, etc.) -->
+            <div class="col-md-4 mb-3">
+                <div class="d-flex justify-content-between align-items-baseline">
+                    <label class="form-label mb-0">Tipo</label>
+                    <a href="{{ url_for('dizionario') }}#tipi" class="small text-decoration-none">Gestisci tipi</a>
+                </div>
+                <select name="tipo" class="form-select">
+                    <option value="">-- Nessun tipo --</option>
+                    {% for t in tipi_list %}
+                        <option value="{{ t['nome'] }}" {% if materiale['tipo'] == t['nome'] %}selected{% endif %}>{{ t['nome'] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Quantità *</label>
+                <input type="number" name="quantita" class="form-control" min="0" value="{{ materiale['quantita'] }}" required>
+                {% if materiale['is_pallet'] %}
+                    <small class="form-text text-muted">Per un bancale il numero rappresenta le lastre contenute.</small>
+                {% endif %}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Dimensione X (mm)</label>
+                <input type="text" name="dimensione_x" class="form-control" value="{{ materiale['dimensione_x'] }}" placeholder="es. 200">
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Dimensione Y (mm)</label>
+                <input type="text" name="dimensione_y" class="form-control" value="{{ materiale['dimensione_y'] }}" placeholder="es. 100">
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Spessore (mm)</label>
+                <input type="text" name="spessore" class="form-control" value="{{ materiale['spessore'] }}" placeholder="es. 30">
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-3 col-6 mb-3">
+                <label class="form-label">Ubicazione - Lettera *</label>
+                <select class="form-select" name="ubicazione_lettera" required>
+                    {% for lettera in lettere %}
+                        <option value="{{ lettera }}" {% if lettera == materiale['ubicazione_lettera'] %}selected{% endif %}>{{ lettera }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 col-6 mb-3">
+                <label class="form-label">Ubicazione - Numero *</label>
+                <select class="form-select" name="ubicazione_numero" required>
+                    {% for numero in numeri %}
+                        <option value="{{ numero }}" {% if numero == materiale['ubicazione_numero'] %}selected{% endif %}>{{ numero }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 col-6 mb-3 d-flex align-items-center">
+                <div class="form-check mt-4">
+                    <input class="form-check-input" type="checkbox" name="sfrido" id="sfrido" {% if materiale['is_sfrido'] %}checked{% endif %}>
+                    <label class="form-check-label" for="sfrido">
+                        Sfrido
+                    </label>
+                </div>
+            </div>
+        </div>
+        <!-- Nuova riga per fornitori e produttori -->
+        <div class="row">
+            <div class="col-md-6 col-12 mb-3">
+                <label class="form-label">Fornitore</label>
+                <input list="fornitore-options-edit" name="fornitore" class="form-control" value="{{ materiale['fornitore'] }}" placeholder="Seleziona o digita...">
+                <datalist id="fornitore-options-edit">
+                    {% for f in fornitori_list %}
+                        <option value="{{ f }}">
+                    {% endfor %}
+                </datalist>
+                <small class="form-text text-muted">Gestisci l'elenco dei fornitori <a href="{{ url_for('config') }}#fornitori">qui</a>.</small>
+            </div>
+            <div class="col-md-6 col-12 mb-3">
+                <label class="form-label">Produttore</label>
+                <input list="produttore-options-edit" name="produttore" class="form-control" value="{{ materiale['produttore'] }}" placeholder="Seleziona o digita...">
+                <datalist id="produttore-options-edit">
+                    {% for p in produttori_list %}
+                        <option value="{{ p }}">
+                    {% endfor %}
+                </datalist>
+                <small class="form-text text-muted">Gestisci l'elenco dei produttori <a href="{{ url_for('config') }}#produttori">qui</a>.</small>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12 mb-3">
+                <label class="form-label">Note</label>
+                <textarea name="note" class="form-control" rows="2">{{ materiale['note'] }}</textarea>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Salva modifiche</button>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Annulla</a>
+    </form>
+</div>
+{% endblock %}

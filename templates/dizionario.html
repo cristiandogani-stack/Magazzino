@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-lg">
+    <h2>Dizionario materiali</h2>
+    <p class="text-muted">Aggiungi o rimuovi i materiali disponibili per il magazzino</p>
+    <!-- Form per aggiungere un nuovo materiale -->
+    <form method="POST" class="row gx-2 gy-2 align-items-center mb-4">
+        <div class="col-sm-8 col-12">
+            <input type="text" name="nome" class="form-control" placeholder="Nuovo materiale..." required>
+        </div>
+        <div class="col-sm-4 col-12">
+            <button type="submit" class="btn btn-primary w-100">Aggiungi</button>
+        </div>
+    </form>
+    <!-- Tabella dei materiali esistenti -->
+    <div class="table-responsive">
+        <table class="table table-striped align-middle text-center anagrafiche-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Materiale</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for mat in materials %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ mat['nome'] }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('delete_materiale_vocab', materiale_id=mat['id']) }}" onsubmit="return confirm('Sei sicuro di voler eliminare questo materiale dal dizionario?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Elimina</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="3" class="text-center">Nessun materiale presente nel dizionario.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <!-- Gestione dei tipi di lavorazione/materiale -->
+    <h3 id="tipi" class="mt-5">Tipo di lavorazione</h3>
+    <p class="text-muted">Aggiungi o rimuovi le tipologie del materiale che potrai selezionare nella pagina di inserimento.</p>
+    <form method="POST" action="{{ url_for('add_tipo_vocab') }}" class="row gx-2 gy-2 align-items-center mb-4">
+        <div class="col-sm-8 col-12">
+            <input type="text" name="nome" class="form-control" placeholder="Nuovo tipo..." required>
+        </div>
+        <div class="col-sm-4 col-12">
+            <button type="submit" class="btn btn-primary w-100">Aggiungi tipo</button>
+        </div>
+    </form>
+    <div class="table-responsive">
+        <table class="table table-striped align-middle text-center anagrafiche-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Tipo</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for t in tipi %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ t['nome'] }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('delete_tipo_vocab', tipo_id=t['id']) }}" onsubmit="return confirm('Sei sicuro di voler eliminare questo tipo dal dizionario?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Elimina</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="3" class="text-center">Nessun tipo presente nel dizionario.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {# <a href="{{ url_for('dashboard') }}" class="btn btn-secondary mt-3">Torna alla dashboard</a> #}
+
+    <!-- Gestione produttori -->
+    <h3 id="produttori" class="mt-5">Produttori</h3>
+    <p class="text-muted">Aggiungi o rimuovi i produttori disponibili.</p>
+    <!-- Form per aggiungere un nuovo produttore -->
+    <form method="POST" action="{{ url_for('dizionario_produttori') }}" class="row gx-2 gy-2 align-items-center mb-4">
+        <div class="col-sm-8 col-12">
+            <input type="text" name="nome" class="form-control" placeholder="Nuovo produttore..." required>
+        </div>
+        <div class="col-sm-4 col-12">
+            <button type="submit" class="btn btn-primary w-100">Aggiungi</button>
+        </div>
+    </form>
+    <!-- Tabella dei produttori esistenti -->
+    <div class="table-responsive">
+        <table id="tab-produttori" class="table table-striped align-middle text-center anagrafiche-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Produttore</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for p in produttori %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ p['nome'] }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('delete_produttore_vocab', produttore_id=p['id']) }}" onsubmit="return confirm('Sei sicuro di voler eliminare questo produttore dal dizionario?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Elimina</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="3" class="text-center">Nessun produttore presente nel dizionario.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Gestione delle macchine -->
+    <h3 id="macchine" class="mt-5">Centri di lavoro</h3>
+    <p class="text-muted">Aggiungi o rimuovi i centri di lavoro disponibili per l'assegnazione nelle prenotazioni.</p>
+    <!-- Form per aggiungere una nuova macchina -->
+    <form method="POST" action="{{ url_for('dizionario_macchine') }}" class="row gx-2 gy-2 align-items-center mb-4">
+        <div class="col-sm-8 col-12">
+            <input type="text" name="nome" class="form-control" placeholder="Nuovo centro di lavoro..." required>
+        </div>
+        <div class="col-sm-4 col-12">
+            <button type="submit" class="btn btn-primary w-100">Aggiungi</button>
+        </div>
+    </form>
+    <!-- Tabella delle macchine esistenti -->
+    <div class="table-responsive">
+        <table class="table table-striped align-middle text-center anagrafiche-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Macchina</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for m in macchine %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ m['nome'] }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('delete_macchina_vocab', macchina_id=m['id']) }}" onsubmit="return confirm('Sei sicuro di voler eliminare questa macchina dal dizionario?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Elimina</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="3" class="text-center">Nessuna macchina presente nel dizionario.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

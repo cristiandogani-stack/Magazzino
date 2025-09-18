@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-lg">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Sfridi</h1>
+    <!-- Tasto per tornare alla dashboard principale -->
+    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">Torna alla dashboard</a>
+  </div>
+  {% if lastre %}
+  <div class="table-responsive">
+    <table class="table table-sm table-striped align-middle">
+      <thead>
+        <tr>
+          <th>Ubicazione</th>
+          <th>Materiale</th>
+          <th>Tipo</th>
+          <th>Spessore</th>
+          <th>Dim X</th>
+          <th>Dim Y</th>
+          <th>Produttore</th>
+          <th>Fornitore</th>
+          <th>Note</th>
+          <th>Azioni</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in lastre %}
+        <tr>
+          <td>{{ l['ubicazione_lettera'] }}-{{ l['ubicazione_numero'] }}</td>
+          <td>{{ l['materiale'] }}</td>
+          <td>{{ l['tipo'] }}</td>
+          <td>{{ l['spessore'] }}</td>
+          <td>{{ l['dimensione_x'] }}</td>
+          <td>{{ l['dimensione_y'] }}</td>
+          <td>{{ l['produttore'] }}</td>
+          <td>{{ l['fornitore'] }}</td>
+          <td>{{ l['note'] }}</td>
+          <td class="text-nowrap align-middle">
+            <!-- Pulsanti azione: Dettaglio e Prenota, allineati orizzontalmente e con dimensione piccola come nelle altre viste -->
+            <div class="btn-group btn-group-sm" role="group">
+                <a class="btn btn-sm btn-secondary" href="{{ url_for('dettaglio', material_id=l['id']) }}">Dettaglio</a>
+                {%- if reserved_ids and l['id'] in reserved_ids -%}
+                <span class="btn btn-sm btn-secondary disabled" aria-disabled="true">Prenotata</span>
+                {%- else -%}
+                <a class="btn btn-sm btn-warning" href="{{ url_for('prenota', material_id=l['id']) }}">Prenota</a>
+                {%- endif -%}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="alert alert-warning">Nessuno sfrido trovato.</div>
+  {% endif %}
+</div>
+{% endblock %}

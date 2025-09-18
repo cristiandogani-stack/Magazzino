@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-lg">
+    <h2>Crea sfrido per ID {{ slab_id }}</h2>
+    <!-- Mostra i dettagli principali del materiale originale -->
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            Dettagli lastra rimossa
+        </div>
+        <div class="card-body">
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item"><strong>Materiale:</strong> {{ base_materiale or '—' }}</li>
+                <li class="list-group-item"><strong>Tipo:</strong> {{ base_tipo or '—' }}</li>
+                <li class="list-group-item"><strong>Spessore:</strong> {{ base_spessore or '—' }}</li>
+                <li class="list-group-item"><strong>Fornitore:</strong> {{ base_fornitore or '—' }}</li>
+                <li class="list-group-item"><strong>Produttore:</strong> {{ base_produttore or '—' }}</li>
+                <li class="list-group-item"><strong>Dimensioni originali (X × Y):</strong> {{ base_dim_x or '—' }} × {{ base_dim_y or '—' }}</li>
+            </ul>
+        </div>
+    </div>
+    <form method="POST">
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="dimensione_x" class="form-label">Nuova dimensione X (mm) *</label>
+                <input type="text" class="form-control" name="dimensione_x" id="dimensione_x" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="dimensione_y" class="form-label">Nuova dimensione Y (mm) *</label>
+                <input type="text" class="form-control" name="dimensione_y" id="dimensione_y" required>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="pallet-select" class="form-label">Bancale esistente</label>
+                <!-- Mostra un suggerimento se esiste un bancale precedente compatibile -->
+                {% if previous_pallet_id %}
+                <div class="alert alert-info py-1 px-2 small mb-2">Bancale precedente: ID {{ previous_pallet_id }} ({{ previous_pallet_letter }}{{ previous_pallet_number }})</div>
+                {% endif %}
+                <select class="form-select" name="pallet_id" id="pallet-select">
+                    <option value="new" {% if not previous_pallet_id %}selected{% endif %}>Nessuno (crea nuovo bancale)</option>
+                    {% for p in pallets %}
+                        <option value="{{ p['id'] }}" {% if previous_pallet_id and previous_pallet_id == p['id'] %}selected{% endif %}>ID {{ p['id'] }} - {{ p['ubicazione_lettera'] }}{{ p['ubicazione_numero'] }} ({{ p['materiale'] or '' }}{{ ' / ' + p['tipo'] if p['tipo'] else '' }}{{ ' / ' + p['spessore'] if p['spessore'] else '' }})</option>
+                    {% endfor %}
+                </select>
+                <small class="form-text text-muted">Seleziona un bancale compatibile per aggregare lo sfrido, oppure lascia "Nessuno" per crearne uno nuovo.</small>
+            </div>
+            <div class="col-md-3 col-6 mb-3">
+                <label for="ubicazione_lettera" class="form-label">Ubicazione - Lettera *</label>
+                <select class="form-select" name="ubicazione_lettera" id="ubicazione_lettera">
+                    <option value="">—</option>
+                    {% for letter in ('A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z') %}
+                        <option value="{{ letter }}">{{ letter }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 col-6 mb-3">
+                <label for="ubicazione_numero" class="form-label">Ubicazione - Numero *</label>
+                <select class="form-select" name="ubicazione_numero" id="ubicazione_numero">
+                    <option value="">—</option>
+                    {% for n in range(1, 100) %}
+                        <option value="{{ n }}">{{ n }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <p class="small text-muted">L'ubicazione viene utilizzata solo se si crea un nuovo bancale. Se selezioni un bancale esistente, l'ubicazione verrà ignorata.</p>
+        <button type="submit" class="btn btn-primary btn-lg">Crea sfrido</button>
+        <a href="{{ url_for('scan') }}" class="btn btn-secondary ms-2">Annulla</a>
+    </form>
+</div>
+<script>
+// Mostra o nasconde i campi di ubicazione in base alla selezione del bancale.
+document.addEventListener('DOMContentLoaded', function() {
+    const palletSelect = document.getElementById('pallet-select');
+    const ubicazioneFields = [document.getElementById('ubicazione_lettera'), document.getElementById('ubicazione_numero')];
+    function toggleUbicazioneFields() {
+        const isNew = !palletSelect.value || palletSelect.value === 'new';
+        ubicazioneFields.forEach(function(el) {
+            el.disabled = !isNew;
+        });
+    }
+    palletSelect.addEventListener('change', toggleUbicazioneFields);
+    // Inizializza lo stato corretto al caricamento
+    toggleUbicazioneFields();
+});
+</script>
+{% endblock %}

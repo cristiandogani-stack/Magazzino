@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-lg">
+    <h1 class="mb-4">Modifica utente</h1>
+    <form method="post">
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <label for="username" class="form-label">Nome utente</label>
+                <input type="text" class="form-control" id="username" name="username" value="{{ user.username }}" required>
+            </div>
+            <div class="col-md-6">
+                <label for="password" class="form-label">Nuova password</label>
+                <input type="password" class="form-control" id="password" name="password" placeholder="Lascia vuoto per non modificare">
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Seleziona e ordina le tab abilitate</label>
+            <!-- Elenco ordinabile di tab per l'utente in modifica.  Se è stata fornita
+                 la variabile ordered_tabs dal backend, utilizziamo quella per
+                 determinare l'ordine iniziale; altrimenti ricadiamo su
+                 available_tabs. -->
+            <ul id="tabs-list-edit" class="list-group mb-2">
+                {% if ordered_tabs is defined %}
+                    {% set tabs_for_loop = ordered_tabs %}
+                {% else %}
+                    {% set tabs_for_loop = available_tabs %}
+                {% endif %}
+                {% for value, label in tabs_for_loop %}
+                <li class="list-group-item d-flex align-items-center draggable" draggable="true" style="cursor: grab;">
+                    <input class="form-check-input me-2" type="checkbox" name="tabs" id="tab_{{ value }}" value="{{ value }}" {% if value in user.tabs %}checked{% endif %}>
+                    <label class="form-check-label flex-grow-1" for="tab_{{ value }}">{{ label }}</label>
+                </li>
+                {% endfor %}
+            </ul>
+            <div class="form-text">Trascina le righe per modificare l'ordine. Solo le voci selezionate verranno mostrate al login.</div>
+        </div>
+    <div class="mb-3">
+        <label for="ordine_template" class="form-label">Template testo ordine</label>
+        <!-- Campo per impostare il testo predefinito della email di riordino. Viene utilizzato nella pagina Riordini. -->
+        <textarea class="form-control" id="ordine_template" name="ordine_template" rows="4" placeholder="Testo predefinito per l'ordine...">{{ user.ordine_template or '' }}</textarea>
+        <div class="form-text">Questo testo sarà inserito all'inizio del corpo email quando prepari un ordine di riordino. Puoi utilizzare linee multiple.</div>
+    </div>
+        <button type="submit" class="btn btn-primary">Salva modifiche</button>
+        <a href="{{ url_for('accessi') }}" class="btn btn-secondary">Annulla</a>
+    </form>
+
+    <!-- Script per abilitare il trascinamento e il riordinamento della lista di tab nel modulo di modifica utente. -->
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        function setupDragSortable(listId) {
+          const list = document.getElementById(listId);
+          if (!list) return;
+          let draggingEl = null;
+          list.addEventListener('dragstart', function (e) {
+            if (!e.target.classList.contains('draggable')) return;
+            draggingEl = e.target;
+            e.target.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+          });
+          list.addEventListener('dragend', function (e) {
+            if (!e.target.classList.contains('draggable')) return;
+            e.target.classList.remove('dragging');
+            draggingEl = null;
+          });
+          list.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(list, e.clientY);
+            const draggable = list.querySelector('.dragging');
+            if (!draggable) return;
+            if (afterElement == null) {
+              list.appendChild(draggable);
+            } else {
+              list.insertBefore(draggable, afterElement);
+            }
+          });
+        }
+        function getDragAfterElement(container, y) {
+          const draggableElements = [...container.querySelectorAll('.draggable:not(.dragging)')];
+          let closestElement = null;
+          let closestOffset = Number.NEGATIVE_INFINITY;
+          draggableElements.forEach(el => {
+            const rect = el.getBoundingClientRect();
+            const offset = y - rect.top - rect.height / 2;
+            if (offset < 0 && offset > closestOffset) {
+              closestOffset = offset;
+              closestElement = el;
+            }
+          });
+          return closestElement;
+        }
+        // Inizializza la lista nel modulo di modifica (tabs-list-edit)
+        setupDragSortable('tabs-list-edit');
+      });
+    </script>
+</div>
+{% endblock %}

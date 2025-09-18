@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-lg">
+    <h2>Articoli preferiti – riepilogo quantità</h2>
+    <p class="mb-3">Elenco delle combinazioni dei materiali preferiti con la quantità totale disponibile che richiedono riordino. Le dimensioni X e Y sono riportate per riferimento.</p>
+    {% if not combos %}
+        <div class="alert alert-info">Non ci sono articoli preferiti al momento.</div>
+    {% else %}
+    <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Materiale</th>
+                    <th>Tipo</th>
+                    <th>Spessore</th>
+                    <th>Dimensione&nbsp;X</th>
+                    <th>Dimensione&nbsp;Y</th>
+                    <th>Quantità&nbsp;totale</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in combos %}
+                <tr>
+                    <td>{{ c.materiale }}</td>
+                    <td>{{ c.tipo if c.tipo else '—' }}</td>
+                    <td>{{ c.spessore if c.spessore else '—' }}</td>
+                    <td>{{ c.dimensione_x if c.dimensione_x else '—' }}</td>
+                    <td>{{ c.dimensione_y if c.dimensione_y else '—' }}</td>
+                    <td>{{ c.quantita_totale }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    <!-- Pulsante per tornare alla lista completa dei riordini -->
+    <a class="btn btn-danger mt-3 me-2" href="{{ url_for('riordini') }}">Vai a riordini</a>
+    <!-- Pulsante per tornare alla dashboard -->
+    <a class="btn btn-secondary mt-3" href="{{ url_for('dashboard') }}">Indietro alla dashboard</a>
+</div>
+{% endblock %}

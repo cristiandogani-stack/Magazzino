@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scannerizza QR Code</title>
+  </head>
+  <body>
+    <h1>Carica un QR Code per Scannerizzare</h1>
+    <form method="POST" enctype="multipart/form-data">
+        <input type="file" name="foto" accept="image/*" required>
+        <button type="submit">Scannerizza</button>
+    </form>
+    {% if error %}
+      <p style="color: red;">{{ error }}</p>
+    {% endif %}
+    {% if material_info %}
+      <h3>Materiale trovato: {{ material_info['materiale_nome'] }}</h3>
+      <form method="POST" action="{{ url_for('remove_material') }}" onsubmit="return confirm('Sei sicuro di voler rimuovere questo materiale?');">
+        <input type="hidden" name="material_id" value="{{ material_info['id'] }}">
+        <button type="submit">Elimina Materiale</button>
+      </form>
+    {% endif %}
+  </body>
+</html>

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <h2>Dizionario Materiali</h2>
+    <form method="POST" class="row g-3">
+        <div class="col-10 col-md-6">
+            <input type="text" class="form-control" name="nome" placeholder="Aggiungi nuovo materiale" required>
+        </div>
+        <div class="col-2 col-md-2">
+            <button class="btn btn-success w-100" type="submit">Aggiungi</button>
+        </div>
+    </form>
+    <table class="table mt-4 text-center align-middle anagrafiche-table">
+        <thead><tr><th>#</th><th>Materiale</th><th>Elimina</th></tr></thead>
+        <tbody>
+            {% for mat in materiali %}
+            <tr>
+                <td>{{mat['id']}}</td>
+                <td>{{mat['nome']}}</td>
+                <td>
+                    <form method="post" action="{{ url_for('materiali_delete', mid=mat['id']) }}" style="display:inline;" onsubmit="return confirm('Rimuovere materiale?');">
+                        <button class="btn btn-danger btn-sm" type="submit">Elimina</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <a class="btn btn-secondary mt-2" href="{{ url_for('dashboard') }}">Torna alla Home</a>
+</div>
+{% endblock %}

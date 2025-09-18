@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-lg">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="mb-0">Gestione Accessi</h1>
+        <div class="d-flex align-items-center">
+            <div class="btn-group me-2">
+                <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    Export Database
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="{{ url_for('export_database', fmt='excel') }}">Excel (.xlsx)</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('export_database', fmt='csv') }}">CSV (zip)</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('export_database', fmt='json') }}">JSON</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('export_database', fmt='sqlite') }}">SQLite</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('export_database', fmt='all') }}">All-in-one (zip)</a></li>
+                </ul>
+            </div>
+            <form method="post" action="{{ url_for('reset_database') }}" onsubmit="return confirm('Sei sicuro di voler svuotare completamente il database? Questa azione è irreversibile.');">
+                <button type="submit" class="btn btn-outline-danger">Resetta Database</button>
+            </form>
+        </div>
+    </div>
+    <!-- Elenco utenti esistenti -->
+    <h4 class="mt-3">Utenti esistenti</h4>
+    <div class="table-responsive mb-4">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Nome utente</th>
+                    <!-- Rimosso visualizzazione colonna password per gli utenti -->
+                    <th>Tab abilitate</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>{{ user.username }}</td>
+                    <td>{{ user.tabs | join(', ') }}</td>
+                    <td>
+                        <!-- Pulsante per modificare l'utente -->
+                        <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-sm btn-secondary me-1">Modifica</a>
+                        <!-- Pulsante per eliminare l'utente -->
+                        <a href="{{ url_for('delete_user', user_id=user.id) }}" class="btn btn-sm btn-danger">Elimina</a>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if users|length == 0 %}
+                <tr>
+                    <!-- colonna unica che copre tutte le colonne visibili -->
+                    <td colspan="3" class="text-center">Nessun utente presente.</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+    <!-- Form per aggiungere un nuovo utente -->
+    <h4>Aggiungi nuovo utente</h4>
+    <form method="post">
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <label for="username" class="form-label">Nome utente</label>
+                <input type="text" class="form-control" id="username" name="username" required>
+            </div>
+            <div class="col-md-6">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="password" name="password" required>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Seleziona e ordina le tab abilitate</label>
+            <!-- Elenco ordinabile di tab.  Gli elementi sono trascinabili e l'ordine
+                 viene preservato al momento dell'invio del modulo.  Ogni elemento
+                 contiene una checkbox che determina se la tab è abilitata. -->
+            <ul id="tabs-list-add" class="list-group mb-2">
+                {% for value, label in available_tabs %}
+                <li class="list-group-item d-flex align-items-center draggable" draggable="true" style="cursor: grab;">
+                    <input class="form-check-input me-2" type="checkbox" name="tabs" id="tab_{{ value }}" value="{{ value }}" checked>
+                    <label class="form-check-label flex-grow-1" for="tab_{{ value }}">{{ label }}</label>
+                </li>
+                {% endfor %}
+            </ul>
+            <div class="form-text">Trascina le righe per modificare l'ordine. Solo le voci selezionate verranno mostrate al login.</div>
+        </div>
+        <button type="submit" class="btn btn-primary">Aggiungi utente</button>
+    </form>
+
+    <!-- Script per abilitare il trascinamento e il riordinamento della lista di tab nel modulo di creazione utente.  
+         La funzione setupDragSortable definisce i comportamenti per dragstart, dragover e dragend.
+         Viene invocata con l'id della lista da rendere ordinabile. -->
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        function setupDragSortable(listId) {
+          const list = document.getElementById(listId);
+          if (!list) return;
+          let draggingEl = null;
+          list.addEventListener('dragstart', function (e) {
+            if (!e.target.classList.contains('draggable')) return;
+            draggingEl = e.target;
+            e.target.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+          });
+          list.addEventListener('dragend', function (e) {
+            if (!e.target.classList.contains('draggable')) return;
+            e.target.classList.remove('dragging');
+            draggingEl = null;
+          });
+          list.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(list, e.clientY);
+            const draggable = list.querySelector('.dragging');
+            if (!draggable) return;
+            if (afterElement == null) {
+              list.appendChild(draggable);
+            } else {
+              list.insertBefore(draggable, afterElement);
+            }
+          });
+        }
+        function getDragAfterElement(container, y) {
+          const draggableElements = [...container.querySelectorAll('.draggable:not(.dragging)')];
+          let closestElement = null;
+          let closestOffset = Number.NEGATIVE_INFINITY;
+          draggableElements.forEach(el => {
+            const rect = el.getBoundingClientRect();
+            const offset = y - rect.top - rect.height / 2;
+            if (offset < 0 && offset > closestOffset) {
+              closestOffset = offset;
+              closestElement = el;
+            }
+          });
+          return closestElement;
+        }
+        // Inizializza la lista nel modulo di creazione (tabs-list-add)
+        setupDragSortable('tabs-list-add');
+      });
+    </script>
+    <!-- Sezione impostazioni email (SMTP) -->
+    <hr class="my-4">
+    <h4>Impostazioni email (SMTP)</h4>
+    <form method="post" action="{{ url_for('update_smtp_settings') }}" class="row g-3 mb-4">
+        <div class="col-md-6">
+            <label for="smtp_host" class="form-label">Server SMTP</label>
+            <input type="text" class="form-control" id="smtp_host" name="smtp_host" placeholder="es. smtp.example.com" value="{{ smtp_settings.get('host', '') }}">
+        </div>
+        <div class="col-md-2">
+            <label for="smtp_port" class="form-label">Porta</label>
+            <input type="number" class="form-control" id="smtp_port" name="smtp_port" placeholder="25" value="{{ smtp_settings.get('port', '') }}">
+        </div>
+        <div class="col-md-4">
+            <label for="smtp_tls" class="form-label">Usa TLS</label>
+            <select id="smtp_tls" name="smtp_tls" class="form-select">
+                <option value="" {% if not smtp_settings.get('tls') %}selected{% endif %}>Default (True)</option>
+                <option value="True" {% if smtp_settings.get('tls', '').lower() in ['true','1','yes'] %}selected{% endif %}>True</option>
+                <option value="False" {% if smtp_settings.get('tls', '').lower() in ['false','0','no'] %}selected{% endif %}>False</option>
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label for="smtp_user" class="form-label">Username</label>
+            <input type="text" class="form-control" id="smtp_user" name="smtp_user" value="{{ smtp_settings.get('user', '') }}">
+        </div>
+        <div class="col-md-6">
+            <label for="smtp_pass" class="form-label">Password</label>
+            <input type="password" class="form-control" id="smtp_pass" name="smtp_pass" value="{{ smtp_settings.get('pass', '') }}">
+        </div>
+        <div class="col-md-6">
+            <label for="smtp_from" class="form-label">Mittente</label>
+            <input type="email" class="form-control" id="smtp_from" name="smtp_from" placeholder="no-reply@example.com" value="{{ smtp_settings.get('from', '') }}">
+            <small class="form-text text-muted">Lascia vuoto per usare lo username come mittente.</small>
+        </div>
+        <div class="col-12">
+            <button type="submit" class="btn btn-primary">Salva impostazioni email</button>
+        </div>
+    </form>
+
+</div>
+{% endblock %}

@@ -1,0 +1,5 @@
+Flask
+qrcode
+pillow
+# Waitress è utilizzato per avviare il server in modalità di produzione
+waitress

@@ -1,0 +1,417 @@
+/*
+ * Foglio di stile personalizzato per la webapp di magazzino.
+ * Qui personalizziamo i colori, il layout e piccoli dettagli
+ * per rendere l'interfaccia più gradevole e facile da usare.
+ *
+ * A partire da questa revisione abbiamo introdotto un font più moderno.
+ * Utilizziamo la famiglia "Poppins" da Google Fonts per dare un aspetto
+ * più pulito e contemporaneo all'interfaccia. L'import avviene tramite
+ * la direttiva @import posta qui in testa al foglio di stile. In questo
+ * modo tutte le pagine che includono questo file beneficeranno
+ * automaticamente del nuovo font senza dover aggiungere link esterni
+ * nei singoli template.
+ */
+
+/* Import del font Poppins con pesi variabili.
+ * Il parametro display=swap assicura che il browser utilizzi un font
+ * di fallback finché il font personalizzato non viene scaricato,
+ * migliorando la percezione delle prestazioni.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+body {
+    /* Colore di sfondo leggero e neutro per una presentazione moderna */
+    background-color: #f7f9fc;
+    color: #333;
+    /* Impostiamo il nuovo font di default. In caso di mancato caricamento
+       il browser utilizzerà un sans-serif generico. */
+    font-family: 'Poppins', sans-serif;
+    font-size: 16px;
+}
+
+/* Navbar */
+.navbar {
+    /* Colore aziendale scuro */
+    background-color: #1f4e79 !important;
+}
+.navbar .navbar-brand {
+    font-weight: bold;
+    color: #ffffff !important;
+}
+.navbar .nav-link {
+    color: #ffffff !important;
+}
+.navbar .nav-link:hover {
+    color: #d1dce9 !important;
+}
+
+/* Container spaziatura */
+.container-lg h1,
+.container-lg h2,
+.container-lg h3 {
+    color: #274690;
+    margin-bottom: 1rem;
+}
+
+/* Tabelle */
+/* Tabelle */
+.table thead th {
+    background-color: #1f4e79;
+    color: #fff;
+}
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: #f9fbfd;
+}
+.table-striped tbody tr:nth-of-type(even) {
+    background-color: #eef3f8;
+}
+
+/*
+ * Allineamento centrato per le tabelle delle anagrafiche articoli.
+ * Aggiungendo la classe ``anagrafiche-table`` agli elementi <table>
+ * nelle pagine di gestione delle anagrafiche articoli, forzaremo
+ * l'allineamento orizzontale e verticale al centro per le celle.
+ */
+.anagrafiche-table th,
+.anagrafiche-table td {
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+
+/* Badge quantità personalizzate (vengono aggiunte in-line nei template) */
+.badge {
+    padding: 0.45em 0.65em;
+    font-size: 0.85em;
+    border-radius: 0.35rem;
+}
+.bg-warning.text-dark {
+    color: #212529 !important;
+}
+
+/* QR image styling */
+.qr-img {
+    /* Riduciamo il bordo e l'imbottitura attorno all'immagine QR per evitare
+       ritagli indesiderati durante la stampa. */
+    border: 1px solid #ccd;
+    border-radius: 4px;
+    padding: 2px;
+    background-color: #fff;
+}
+
+/* Buttons */
+.btn {
+    border-radius: 0.4rem;
+}
+.btn-info {
+    color: #fff;
+}
+
+/* Piccolo pallino rosso per indicare gli sfridi */
+.sfrido-dot {
+    color: #dc3545;
+    font-size: 1.2em;
+    line-height: 1;
+}
+
+/* Child rows in the dashboard table are indented and use a subtler
+   background colour to distinguish them from their parent rows. */
+tr.child-row {
+    background-color: #f5f8fb;
+}
+
+/* Stile per la tabella annidata che mostra le lastre figlie all'interno di un bancale.
+   Aggiungiamo un leggero margine a sinistra per evidenziare l'annidamento e
+   colori di sfondo distinti per l'intestazione e le celle. */
+.child-table {
+    margin-left: 1.5rem;
+    width: calc(100% - 1.5rem);
+    background-color: #ffffff;
+}
+.child-table thead th {
+    background-color: #f0f5fa;
+    color: #333;
+    font-size: 0.85rem;
+}
+.child-table tbody td {
+    background-color: #fbfdfe;
+    font-size: 0.85rem;
+}
+
+/* Evidenzia bancali, lastre e sfridi con colori diversi per una migliore
+   distinzione visiva. Le classi vengono applicate alle righe
+   direttamente nel template. */
+.pallet-row {
+    background-color: #e7f0fa;
+}
+.sfrido-row {
+    background-color: #fff3f3;
+}
+.slab-row {
+    background-color: #f9fbfd;
+}
+
+/* Evidenzia le righe che necessitano riordino con un bordo laterale arancione
+   e una leggera tonalità gialla. Questo aiuta l'utente a notare
+   rapidamente i materiali con quantità bassa (<= soglia di riordino). */
+.reorder-row {
+    border-left: 4px solid #f0ad4e;
+    background-color: #fff8e5;
+}
+
+/* Stile per la cella QR nella dashboard: include immagine, ID e pulsante */
+/* Etichetta dell'ID sotto il QR code: la rendiamo ancora più grande
+   (1.5rem) per garantire la massima leggibilità sulle etichette
+   stampate. */
+.qr-cell .small {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #222;
+}
+
+/* Evidenzia le righe che richiedono riordino con un colore giallo tenue */
+.reorder-row {
+    background-color: #fff3cd !important;
+}
+
+/* Evidenzia bancali o lastre indipendenti che contengono lastre prenotate.
+   Utilizziamo un bordo sinistro di colore blu (colore principale
+   Bootstrap) e un tenue sfondo azzurro per segnalare in modo discreto
+   la presenza di prenotazioni attive sul bancale o sulla lastra. */
+.reserved-pallet-row {
+    border-left: 4px solid #0d6efd !important;
+    background-color: #f0f8ff !important;
+}
+.qr-cell button {
+    margin-top: 0.25rem;
+}
+
+/* Toggler button style: remove default underline and adjust spacing */
+.toggle-children {
+    font-size: 1.25rem;
+    line-height: 1;
+    padding: 0;
+    /* Rendi il cursore un pointer per indicare che il pulsante è cliccabile */
+    cursor: pointer;
+    /* Aumenta lo spazio laterale per non accavallare il simbolo con il testo */
+    margin-right: 0.25rem;
+}
+
+/* Evidenzia le righe della tabella quando l'utente passa con il mouse sopra.  */
+.table tbody tr:hover {
+    background-color: #eaf2fa;
+}
+
+/* ------------------------------------------------------------------
+ * Stili per l'interruttore "Ricerca rapida"
+ *
+ * Sostituiamo il pulsante originale con un toggle moderno basato su
+ * Bootstrap.  Le dimensioni del toggle sono aumentate per renderlo
+ * ben visibile anche su dispositivi touch.  Inoltre personalizziamo
+ * i colori per uniformarli alla palette dell'applicazione.  Il
+ * margine sinistro dell'etichetta viene impostato per creare spazio
+ * tra la levetta e il testo.
+ */
+/* Dimensioni maggiorate per l'interruttore */
+#simplify-toggle.form-check-input {
+    width: 2.5rem;
+    height: 1.4rem;
+}
+/* Colori quando il toggle è attivo */
+.form-switch .form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+/* Bordo focus del toggle */
+.form-switch .form-check-input:focus {
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+/* Etichetta spaziata e con font più marcato */
+.form-switch .form-check-label {
+    margin-left: 0.5rem;
+    font-weight: 500;
+}
+
+/* Rendi l'ID sotto il QR ancora più visibile aumentando la dimensione del font */
+.qr-cell .small {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #222;
+}
+
+/*
+ * Semaforo per la pagina Live
+ *
+ * Ogni prenotazione in "Magazzino Live" viene identificata con un
+ * pallino colorato che indica l'urgenza: verde per prenotazioni
+ * lontane dalla scadenza, giallo per quelle a metà del tempo di
+ * percorrenza e rosso per scadenze imminenti o superate.  Queste
+ * classi vengono applicate ai tag <span> creati nel template
+ * `live.html`.  Ogni semaforo è un cerchio pieno con dimensioni
+ * ridotte e margine centrato all'interno della cella.
+ */
+.semaforo {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    margin: 0 auto;
+}
+.semaforo-green {
+    background-color: #28a745; /* verde */
+}
+.semaforo-yellow {
+    background-color: #ffc107; /* giallo */
+}
+.semaforo-red {
+    background-color: #dc3545; /* rosso */
+}
+
+/* Forms */
+.form-label {
+    font-weight: 600;
+}
+
+/* Alerts */
+.alert-dismissible .btn-close {
+    padding: 0.5rem 0.75rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+    .table {
+        font-size: 0.90em;
+    }
+    .btn {
+        font-size: 0.85em;
+        padding: 0.375rem 0.55rem;
+    }
+}
+
+/* ------------------------------------------------------------------
+ * Stili per la ricerca semplificata
+ *
+ * La modalità semplificata mostra quadrati cliccabili che permettono
+ * all'utente di filtrare per materiale, tipo, spessore e produttore.  Le
+ * card devono essere ben visibili, centrate e reattive al passaggio
+ * del mouse.  Qui definiamo alcune classi di supporto per
+ * l'interfaccia semplificata.  Le carte utilizzano l'utility card di
+ * Bootstrap ma con altezza fissa per mantenere un layout uniforme.
+ */
+/* Carte della ricerca rapida.  Sono grandi, con bordo morbido e
+ * colori chiari.  Il design è pensato per essere più accattivante.
+ */
+/* Aggiorniamo il design delle carte per renderle più moderne e meno anni '80.
+ * Utilizziamo un gradiente leggero, un bordo sottile ed effetti di sollevamento
+ * al passaggio del mouse.  Le dimensioni maggiorate migliorano la
+ * leggibilità su dispositivi touch.  Il colore del testo richiama la
+ * palette dell'applicazione.
+ */
+.simplify-card {
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  font-size: 1.25rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(145deg, #f0f7ff 0%, #ffffff 100%);
+  border: 1px solid #cbdaf0;
+  color: #1f4e79;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.06);
+  transition: background 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+  user-select: none;
+}
+.simplify-card:hover {
+  background: linear-gradient(145deg, #e3efff 0%, #f9fbff 100%);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px);
+}
+
+/* Rende il titolo della ricerca rapida più prominente e coordinato con la palette. */
+#simplify-container h4 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #1f4e79;
+}
+/* Nav pill look for active tab */
+.navbar .nav-link.btn { border-width:1px; transition: all .15s ease-in-out; }
+.navbar .nav-link.btn:hover { filter: brightness(1.05); }
+.navbar .nav-link.btn.active { background:#fff; color:#0d6efd !important; border-color:#fff; box-shadow:0 .25rem .5rem rgba(13,110,253,.25); }
+.navbar-dark .navbar-nav .nav-link.btn-outline-light { color:#fff; }
+
+/* Customization for brand bar (logo area) and main navbar */
+/* The top bar behind the logo should match the page background.  Use the
+   Bootstrap body background variable so that it stays consistent with the
+   dashboard's background color (light gray or white depending on theme).
+   We keep a subtle bottom border to separate it from the main navigation. */
+.brand-bar {
+  /* Usa lo stesso colore del body per eliminare completamente lo stacco. */
+  background-color: #f7f9fc !important;
+  /* Rimuoviamo il bordo inferiore: il logo non deve avere contorni visibili. */
+  border-bottom: none !important;
+  /* Elimina eventuale ombreggiatura ereditata. */
+  box-shadow: none !important;
+}
+
+/* Elimina qualsiasi sfondo bianco o contorno sul logo.  Lo sfondo e i bordi
+   del link contenente il logo devono essere trasparenti per fondersi con
+   il colore della dashboard.  Rimuoviamo inoltre eventuali ombre o padding
+   superflui per evitare che appaia come un riquadro separato. */
+.brand-bar .navbar-brand {
+  background-color: #f7f9fc !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0;
+}
+
+/* Main navbar tinted blue with rounded bottom-left corner */
+.navbar-main {
+  background: #0d6efd;
+  color: #fff;
+  /* Aumentiamo il raggio dell'angolo in basso a sinistra della navbar
+     per un effetto più morbido quando la barra blu incontra la sezione del logo. */
+  border-bottom-left-radius: 1rem;
+}
+.navbar-main .navbar-brand,
+.navbar-main .nav-link {
+  color: #fff !important;
+}
+.navbar-main .nav-link.active {
+  background: #ffffff;
+  color: #0d6efd !important;
+}
+
+/* Ensure the logo image itself has no background/outline so it blends with the dashboard color */
+.brand-bar img {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/*
+ * Migliorie per la pagina "Scarico" (scan) su schermi piccoli
+ *
+ * In modalità mobile, il lettore QR e i pulsanti devono adattarsi
+ * alla larghezza dello schermo per facilitare la scansione e le
+ * interazioni dell'utente.  Poiché il template include uno stile
+ * inline per #reader con un max‑width fisso, qui lo sovrascriviamo
+ * con !important e impostiamo anche la larghezza a 100% così da
+ * sfruttare tutta la larghezza disponibile.  Inoltre estendiamo
+ * la larghezza dei pulsanti del form e del link "Torna al magazzino"
+ * perché siano facilmente cliccabili su smartphone.
+ */
+@media (max-width: 576px) {
+  /* Il contenitore del lettore QR occupa tutta la larghezza */
+  #reader {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 auto;
+  }
+  /* Pulsanti a larghezza piena per facilitare il tap su mobile */
+  #remove-form button.btn,
+  a.btn-secondary {
+    display: block;
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+}

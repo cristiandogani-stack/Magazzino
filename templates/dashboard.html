@@ -1,0 +1,804 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-lg">
+    <h1 class="mb-4">Dashboard</h1>
+    <!-- Riepilogo rapido (solo sfridi e riordino) -->
+    <div class="row g-3 mb-3">
+        <!-- Card sfridi: conta ogni singolo sfrido, anche all'interno dei bancali -->
+        <div class="col-lg-6 col-md-6 col-sm-12">
+            {# La card degli sfridi è ora un link: cliccandola si accede alla pagina dedicata con l'elenco delle lastre marcate come sfrido #}
+            <a href="{{ url_for('sfridi') }}" class="text-decoration-none">
+                <div class="card border-warning shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <h6 class="card-title">Sfridi</h6>
+                        <p class="card-text fs-3 fw-bold text-warning">{{ total_sfridi }}</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <!-- Card riordino: materiali da riordinare -->
+        <div class="col-lg-6 col-md-6 col-sm-12">
+            {# Verifica i permessi per la vista riordini.  Se l'utente non ha il
+               tab 'riordini' la card viene mostrata come disabilitata senza link. #}
+            {% set can_riordini = 'riordini' in session.get('allowed_tabs', []) %}
+            {% if can_riordini %}
+            <a href="{{ url_for('riordini') }}" class="text-decoration-none">
+                <div class="card border-danger shadow-sm h-100">
+            {% else %}
+                <div class="card border-secondary shadow-sm h-100" style="cursor:not-allowed" aria-disabled="true">
+            {% endif %}
+                    <div class="card-body text-center">
+                        <h6 class="card-title">Da riordinare</h6>
+                        <p class="card-text fs-3 fw-bold {% if can_riordini %}text-danger{% else %}text-muted{% endif %}">{{ reorder_count }}</p>
+                    </div>
+            {% if can_riordini %}
+                </div>
+            </a>
+            {% else %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    <!-- Avviso per scorte minime -->
+    {% if low_stock_count > 0 %}
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <strong>Attenzione!</strong> {{ low_stock_count }} {{ 'materiale' if low_stock_count == 1 else 'materiali' }} con scorte basse (≤ {{ alert_threshold }}). Controlla il magazzino.
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+    <!-- Pulsanti di azione disposti a sinistra, centro e destra.
+         Sposta ubicazione viene posizionato a sinistra, la ricerca rapida
+         è ora un interruttore moderno al centro e il pulsante per
+         aggiungere un nuovo materiale è spostato a destra.  Utilizziamo
+         una riga con tre colonne per garantire un allineamento uniforme
+         su qualsiasi dimensione di schermo. -->
+    <div class="row g-2 mb-3 align-items-center">
+        <!-- Colonna sinistra: sposta ubicazione -->
+        <div class="col-12 col-md-4 d-flex justify-content-start mb-2 mb-md-0">
+            <button id="move-btn" type="button" class="btn btn-primary">Sposta ubicazione</button>
+        </div>
+        <!-- Colonna centrale: interruttore ricerca rapida -->
+        <div class="col-12 col-md-4 d-flex justify-content-center mb-2 mb-md-0">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="simplify-toggle">
+                <label class="form-check-label" for="simplify-toggle">Ricerca rapida</label>
+            </div>
+        </div>
+        <!-- Colonna destra: aggiungi nuovo materiale -->
+        <div class="col-12 col-md-4 d-flex justify-content-end">
+            <a class="btn btn-success" href="{{ url_for('add') }}">+ Nuovo materiale</a>
+        </div>
+    </div>
+    <!-- Barra di spostamento: visibile solo in modalità spostamento -->
+    <div id="move-bar" class="alert alert-info d-none d-flex align-items-center gap-2 mb-3" role="alert">
+        <div class="input-group me-2">
+            <!-- Campo per selezionare la nuova ubicazione: usa lo stesso datalist dei filtri (ubicazioni-list) -->
+            <input id="move-location-input" type="text" class="form-control" placeholder="Nuova ubicazione" list="ubicazioni-list">
+        </div>
+        <button id="confirm-move-btn" type="button" class="btn btn-success">Conferma spostamento</button>
+    </div>
+    <!-- Contenitore per la ricerca semplificata (quadrati cliccabili).  È nascosto di default e viene mostrato quando l'utente attiva la modalità semplificata tramite il pulsante "Semplifica". -->
+    <div id="simplify-container" class="my-3 d-none"></div>
+    <!-- Form di ricerca e filtri.  I filtri principali sono disposti su due righe da quattro colonne,
+         assicurando un allineamento uniforme.  Le azioni di filtraggio e reset sono posizionate
+         sotto le due righe di filtri, affiancate e allineate a destra. -->
+    <form method="get" id="filter-form">
+        <!-- Prima riga: quattro filtri principali in orizzontale -->
+        <div class="row g-2 mb-3">
+            <!-- Filtro materiale -->
+            <div class="col-md-3 col-sm-6">
+                <select name="materiale" class="form-select">
+                    <option value="">Materiale</option>
+                    {% for mat in materiali_list %}
+                        <option value="{{ mat }}" {% if mat == materiale_filtro %}selected{% endif %}>{{ mat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <!-- Filtro tipo -->
+            <div class="col-md-3 col-sm-6">
+                <select name="tipo" class="form-select">
+                    <option value="">Tipo</option>
+                    {% for t in tipi %}
+                        <option value="{{ t['nome'] }}" {% if t['nome'] == tipo_filtro %}selected{% endif %}>{{ t['nome'] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <!-- Filtro produttore -->
+            <div class="col-md-3 col-sm-6">
+                <select name="produttore" class="form-select">
+                    <option value="">Produttore</option>
+                    {% for prod in produttori %}
+                        <option value="{{ prod }}" {% if prod == produttore_filtro %}selected{% endif %}>{{ prod }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <!-- Filtro fornitore -->
+            <div class="col-md-3 col-sm-6">
+                <select name="fornitore" class="form-select">
+                    <option value="">Fornitore</option>
+                    {% for forn in suppliers %}
+                        <option value="{{ forn }}" {% if forn == fornitore_filtro %}selected{% endif %}>{{ forn }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <!-- Seconda riga: quattro filtri dimensionali in orizzontale -->
+        <div class="row g-2 mb-3">
+            <!-- Filtro ubicazione combinato -->
+            <div class="col-md-3 col-sm-6">
+                <input type="text" class="form-control" name="ubicazione"
+                       list="ubicazioni-list"
+                       placeholder="Ubicazione (es. A-1)"
+                       value="{{ filtro_ubicazione }}">
+                <datalist id="ubicazioni-list">
+                    {% for lettera in lettere %}
+                        {% for numero in numeri %}
+                            <option value="{{ lettera }}-{{ numero }}"></option>
+                        {% endfor %}
+                    {% endfor %}
+                </datalist>
+            </div>
+            <!-- Filtro dimensione X -->
+            <div class="col-md-3 col-sm-6">
+                <input type="text" class="form-control" name="max_x" placeholder="Misura (X)" value="{{ max_x }}">
+            </div>
+            <!-- Filtro dimensione Y -->
+            <div class="col-md-3 col-sm-6">
+                <input type="text" class="form-control" name="max_y" placeholder="Misura (Y)" value="{{ max_y }}">
+            </div>
+            <!-- Filtro spessore -->
+            <div class="col-md-3 col-sm-6">
+                <input type="text" class="form-control" name="spessore" placeholder="Spessore" value="{{ spessore }}">
+            </div>
+        </div>
+        <!-- Terza riga: filtro ID Lastra a sinistra e pulsanti a destra -->
+        <div class="row g-2 mb-3 align-items-end">
+            <div class="col-auto">
+                <input type="number" inputmode="numeric" pattern="[0-9]*" step="1" min="0"
+                       class="form-control" name="id_lastra" placeholder="ID Lastra"
+                       value="{{ request.args.get('id_lastra', '') }}">
+            </div>
+            <div class="col d-flex justify-content-end gap-2">
+                <button type="submit" class="btn btn-outline-primary">Filtra</button>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">Reset filtri</a>
+            </div>
+        </div>
+    </form>
+    <!-- Tabella materiali con supporto per la visualizzazione dettagliata dei bancali -->
+    <div class="table-responsive" id="materiali-table-container">
+        <table class="table table-striped table-hover align-middle" id="materiali-table">
+            <thead>
+                <tr>
+                    <!-- Colonna per la selezione in modalità spostamento (nascosta di default) -->
+                    <th class="move-col d-none text-center" style="width:2rem;"></th>
+                    <th class="text-center" style="width:3.5rem;">Documenti</th>
+                    <th style="display:none;">ID</th>
+                    <th>Materiale</th>
+                    <th>Tipo</th>
+                    <!-- Colonna fornitore: mostra il fornitore del materiale se presente -->
+                    <th>Fornitore</th>
+                    <th>Produttore</th>
+                    <th>
+                        <a href="{{ url_for('dashboard', materiale=materiale_filtro, tipo=tipo_filtro, produttore=produttore_filtro, fornitore=fornitore_filtro, ubicazione_lettera=filtro_lettera, ubicazione_numero=filtro_numero, max_x=max_x, max_y=max_y, spessore=spessore, view=view_filter, sort_spessore=('desc' if sort_spessore=='asc' else 'asc')) }}"
+                           class="text-decoration-none text-white">Spessore</a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('dashboard', materiale=materiale_filtro, tipo=tipo_filtro, produttore=produttore_filtro, fornitore=fornitore_filtro, ubicazione_lettera=filtro_lettera, ubicazione_numero=filtro_numero, max_x=max_x, max_y=max_y, spessore=spessore, view=view_filter, sort_qty=('desc' if sort_qty=='asc' else 'asc')) }}"
+                           class="text-decoration-none text-white">Quantità</a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('dashboard', materiale=materiale_filtro, tipo=tipo_filtro, produttore=produttore_filtro, fornitore=fornitore_filtro, ubicazione_lettera=filtro_lettera, ubicazione_numero=filtro_numero, max_x=max_x, max_y=max_y, spessore=spessore, view=view_filter, sort_ubicazione=('desc' if sort_ubicazione=='asc' else 'asc')) }}"
+                           class="text-decoration-none text-white">Ubicazione</a>
+                    </th>
+                    <th>Sfrido</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for m in materiali %}
+                <tr class="{% if m['is_pallet'] %}pallet-row{% elif m['is_sfrido'] %}sfrido-row{% else %}slab-row{% endif %}{% if m['id'] in reorder_ids %} reorder-row{% endif %}{% if reserved_highlight_ids and m['id'] in reserved_highlight_ids %} reserved-pallet-row{% endif %}">
+                    <!-- Checkbox di selezione per la modalità spostamento; nascosto di default -->
+                    <td class="move-col d-none text-center align-middle">
+                        <input type="checkbox" class="form-check-input move-checkbox d-none" value="{{ m['id'] }}" data-id="{{ m['id'] }}">
+                    </td>
+                    <td class="text-center align-middle">
+                        <button class="btn btn-sm btn-outline-info position-relative" type="button" data-bs-toggle="modal" data-bs-target="#docs-modal-{{ m['id'] }}">
+                            Docs
+                            {% set doc_count = m['attachments']|length %}
+                            {% if doc_count > 0 %}
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-secondary">{{ doc_count }}</span>
+                            {% endif %}
+                        </button>
+                    </td>
+                    <td style="display:none;">{{ m['id'] }}</td>
+                    <td data-bs-toggle="tooltip" data-bs-placement="top" title="{{ m['note'] if m['note'] else '' }}">{{ m['materiale'] }}</td>
+                    <td>{{ m['tipo'] if m['tipo'] else '--' }}</td>
+                    <td>{{ m['fornitore'] if m['fornitore'] else '--' }}</td>
+                    <td>{{ m['produttore'] if m['produttore'] else '--' }}</td>
+                    <td>{{ m['spessore'] if m['spessore'] else '--' }}</td>
+                    <td>
+                        <span class="badge {% if m['quantita']|int >= 10 %}bg-success{% elif m['quantita']|int >= 5 %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ m['quantita'] }}</span>
+                    </td>
+                    <td>{{ m['ubicazione_lettera'] }}-{{ m['ubicazione_numero'] }}</td>
+                    <td class="text-center">
+                        {% if m['is_sfrido'] or m.get('child_has_sfrido') %}
+                            <span class="sfrido-dot">●</span>
+                        {% else %}
+                            &mdash;
+                        {% endif %}
+                    </td>
+                    <td>
+                        {#
+                          Link ai dettagli.  Se è stato applicato il filtro per ID
+                          lastra nella dashboard, passiamo come parametro
+                          ``highlight_id`` l'ID della lastra figlia da evidenziare
+                          nella pagina di dettaglio.  Il parametro
+                          ``highlight_child_id`` e ``highlight_root_id`` sono
+                          forniti dal server per indicare rispettivamente la
+                          lastra da evidenziare e il bancale da mostrare.
+                          In assenza di tali parametri, viene generato il link
+                          standard senza query string.
+                        #}
+                        {% if highlight_child_id and highlight_root_id and m['id'] == highlight_root_id %}
+                        <a class="btn btn-sm btn-secondary mb-1" href="{{ url_for('dettaglio', material_id=m['id'], highlight_id=highlight_child_id) }}">
+                            {% if m['is_pallet'] %}Dettagli&nbsp;bancale{% elif m['is_sfrido'] %}Dettaglio&nbsp;sfrido{% else %}Dettaglio&nbsp;lastra{% endif %}
+                        </a>
+                        {% else %}
+                        <a class="btn btn-sm btn-secondary mb-1" href="{{ url_for('dettaglio', material_id=m['id']) }}">
+                            {% if m['is_pallet'] %}Dettagli&nbsp;bancale{% elif m['is_sfrido'] %}Dettaglio&nbsp;sfrido{% else %}Dettaglio&nbsp;lastra{% endif %}
+                        </a>
+                        {% endif %}
+                        {# Removed the Modifica button per specifications #}
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="12" class="text-center">Nessun materiale presente.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <!-- Modali Documenti per ciascun materiale -->
+    {% for m in materiali %}
+        <div class="modal fade" id="docs-modal-{{ m['id'] }}" tabindex="-1" aria-labelledby="docsLabel-{{ m['id'] }}" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="docsLabel-{{ m['id'] }}">Documenti materiale ID {{ m['id'] }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        {% set docs = m['attachments'] %}
+                        {% if docs %}
+                            <ul class="list-group mb-3">
+                                {% for d in docs %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <a href="{{ url_for('download_doc', doc_id=d['id']) }}" target="_blank">{{ d['original_name'] }}</a>
+                                        </div>
+                                        <form method="post" action="{{ url_for('delete_doc', doc_id=d['id']) }}" onsubmit="return confirm('Eliminare questo documento?');" class="ms-3">
+                                            <button class="btn btn-sm btn-danger" type="submit">Elimina</button>
+                                        </form>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p>Nessun documento caricato.</p>
+                        {% endif %}
+                        <!-- Form di caricamento documenti con supporto per scattare foto -->
+                        <form id="docForm-{{ m['id'] }}" method="post" action="{{ url_for('upload_docs', material_id=m['id']) }}" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <label for="docsFile-{{ m['id'] }}" class="form-label">Carica documenti (PNG, JPG, JPEG, PDF)</label>
+                                <!-- Input standard per selezionare più file dal dispositivo (senza attivare la fotocamera) -->
+                                <input class="form-control mb-2" type="file" id="docsFile-{{ m['id'] }}" name="documents" multiple accept="image/*,.pdf">
+                                <!-- Input per scattare una foto: è nascosto visivamente ma resta focusable.  -->
+                                <!-- Evitiamo l'attributo `d-none` perché alcuni browser mobile impediscono l'avvio della fotocamera tramite click() su input nascosti.  -->
+                                <!-- Posizioniamo l'input fuori area visibile e lo attiviamo tramite una label dedicata. -->
+                                <input
+                                    class="form-control"
+                                    type="file"
+                                    id="cameraFile-{{ m['id'] }}"
+                                    name="documents"
+                                    accept="image/*"
+                                    capture="environment"
+                                    onchange="document.getElementById('docForm-{{ m['id'] }}').submit();"
+                                    style="position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;"
+                                >
+                                <div class="d-flex gap-2 mt-2">
+                                    <!-- Label associata al file input: al click avvierà la fotocamera su dispositivi che lo supportano -->
+                                    <label for="cameraFile-{{ m['id'] }}" class="btn btn-secondary mb-0">Scatta foto</label>
+                                    <!-- Bottone per inviare manualmente i file selezionati dal dispositivo -->
+                                    <button type="submit" class="btn btn-primary">Carica</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+    {# Se sono stati specificati filtri per la dimensione e abbiamo trovato delle lastre idonee,
+       mostriamo una tabella riepilogativa.  In caso contrario, se i filtri sono presenti
+       ma non ci sono risultati, mostriamo un messaggio di avviso. #}
+    {% if filtered_slabs %}
+    <h3 class="mt-4">Lastre con dimensioni massime
+        {% if max_x and max_y %}
+            &le; {{ max_x }} x {{ max_y }} mm
+        {% elif max_x %}
+            con X &le; {{ max_x }} mm
+        {% elif max_y %}
+            con Y &le; {{ max_y }} mm
+        {% endif %}
+    </h3>
+    <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Materiale</th>
+                    <th>Tipo</th>
+                    <th>Dim&nbsp;X</th>
+                    <th>Dim&nbsp;Y</th>
+                    <th>Spessore</th>
+                    <th>Ubicazione</th>
+                    <th>Bancale</th>
+                    <th>Sfrido</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for slab in filtered_slabs %}
+                <tr>
+                    <td>{{ slab['id'] }}</td>
+                    <td>{{ slab['materiale'] }}</td>
+                    <td>{{ slab['tipo'] if slab['tipo'] else '--' }}</td>
+                    <td>{{ slab['dimensione_x'] if slab['dimensione_x'] else '--' }}</td>
+                    <td>{{ slab['dimensione_y'] if slab['dimensione_y'] else '--' }}</td>
+                    <td>{{ slab['spessore'] if slab['spessore'] else '--' }}</td>
+                    <td>{{ slab['ubicazione_lettera'] }}-{{ slab['ubicazione_numero'] }}</td>
+                    <td>{% if slab['parent_id'] %}{{ slab['parent_id'] }}{% else %}--{% endif %}</td>
+                    <td class="text-center">{% if slab['is_sfrido'] %}<span class="sfrido-dot">●</span>{% else %}&mdash;{% endif %}</td>
+                    <td>
+                        <a class="btn btn-sm btn-secondary mb-1" href="{{ url_for('dettaglio', material_id=slab['id']) }}">Dettaglio</a>
+                        {%- if reserved_ids and slab['id'] in reserved_ids -%}
+                        <span class="btn btn-sm btn-secondary mb-1 disabled" aria-disabled="true">Prenotata</span>
+                        {%- else -%}
+                        <a class="btn btn-sm btn-warning mb-1" href="{{ url_for('prenota', material_id=slab['id']) }}">Prenota</a>
+                        {%- endif -%}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% elif max_x or max_y %}
+    <div class="alert alert-warning mt-4">Nessuna lastra trovata con le dimensioni specificate.</div>
+    {% endif %}
+    <!-- Fine contenuto principale (sezione decorativa rimossa su richiesta) -->
+</div>
+
+<!-- Script per gestire la modalità spostamento e l'invio della richiesta al server -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const moveBtn = document.getElementById('move-btn');
+    const moveBar = document.getElementById('move-bar');
+    const confirmBtn = document.getElementById('confirm-move-btn');
+    const checkboxes = document.querySelectorAll('.move-checkbox');
+    const moveCols = document.querySelectorAll('.move-col');
+    let moveMode = false;
+    function toggleMoveMode(on) {
+      moveMode = on;
+      if (moveMode) {
+        moveBar?.classList.remove('d-none');
+        // Mostra colonne e checkbox e deseleziona eventuali selezioni precedenti
+        checkboxes.forEach(cb => {
+          cb.classList.remove('d-none');
+          cb.checked = false;
+        });
+        moveCols.forEach(col => col.classList.remove('d-none'));
+      } else {
+        moveBar?.classList.add('d-none');
+        checkboxes.forEach(cb => {
+          cb.classList.add('d-none');
+          cb.checked = false;
+        });
+        moveCols.forEach(col => col.classList.add('d-none'));
+      }
+    }
+    moveBtn?.addEventListener('click', function() {
+      toggleMoveMode(!moveMode);
+    });
+    confirmBtn?.addEventListener('click', function() {
+      // Raccogli gli ID selezionati
+      const selectedIds = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+      const locInput = document.getElementById('move-location-input');
+      const targetLoc = (locInput?.value || '').trim();
+      if (!selectedIds.length) {
+        alert('Seleziona almeno un materiale da spostare.');
+        return;
+      }
+      if (!targetLoc) {
+        alert('Inserisci una nuova ubicazione valida.');
+        return;
+      }
+      // Invia la richiesta di spostamento via fetch POST
+      fetch('{{ url_for("bulk_move_location") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ selected_ids: selectedIds.join(','), target_location: targetLoc })
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(data => { throw new Error(data.message || 'Errore durante lo spostamento.'); });
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data.ok) {
+          // Mostra un messaggio di conferma con i dettagli dello spostamento
+          const mergedMsg = data.merged && data.merged > 0 ? ` (fusi ${data.merged} bancali)` : '';
+          alert(`Spostamento completato: spostati ${data.updated} elementi in ${data.target}${mergedMsg}.`);
+          // Ricarica la pagina per riflettere i cambiamenti
+          location.reload();
+        } else {
+          alert(data.message || 'Errore durante lo spostamento.');
+        }
+      })
+      .catch(err => {
+        alert(err.message || 'Errore di rete.');
+      });
+    });
+  });
+</script>
+
+<!-- Script per la modalità di ricerca semplificata.  Quando l'utente
+     preme il pulsante "Semplifica", nascondiamo il modulo dei filtri e
+     la tabella originale e mostriamo un'interfaccia passo‑passo con
+     quadrati cliccabili per selezionare materiale, tipo, spessore e
+     produttore.  Alla fine mostriamo l'elenco delle lastre filtrate. -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Interruttore per la modalità di ricerca rapida.  Quando l'utente attiva
+    // l'interruttore viene avviato il flusso semplificato; disattivandolo
+    // si torna alla vista standard.  Sostituiamo il vecchio pulsante con
+    // un input di tipo checkbox.
+    const simplifyToggle = document.getElementById('simplify-toggle');
+    const simplifyContainer = document.getElementById('simplify-container');
+    const filterForm = document.getElementById('filter-form');
+    const tableContainer = document.getElementById('materiali-table-container');
+    const moveBtn = document.getElementById('move-btn');
+    const moveBar = document.getElementById('move-bar');
+    let simplifyMode = false;
+    // Parse the JSON of materials passed from Flask.  It contains all
+    // lastre/bancali rows with fields: id, materiale, tipo, spessore,
+    // produttore, quantita, ubicazione_lettera, ubicazione_numero, is_sfrido.
+    let materialsData = [];
+    try {
+      materialsData = JSON.parse('{{ materials_json | safe }}');
+    } catch (e) {
+      materialsData = [];
+    }
+    // Elenco degli ID prenotati per mostrare un pulsante "Prenotata"
+    // nelle tabelle dei risultati rapidi.  Viene serializzato dal server
+    // tramite Jinja e convertito in un array JavaScript.
+    const reservedIds = {{ reserved_ids|tojson|safe }};
+    // Variables to hold the current selection in the simplified flow
+    let selectedMaterial = null;
+    let selectedTipo = null;
+    let selectedSpessore = null;
+    let selectedProduttore = null;
+
+    function showStep(titleText, items, onClickItem, formatter) {
+      // Generic helper to render a step with a title and a grid of cards.
+      // items: array of raw values; onClickItem(value) called when user clicks.
+      // formatter(value) optional to display value differently.
+      simplifyContainer.innerHTML = '';
+      const header = document.createElement('h4');
+      header.textContent = titleText;
+      header.className = 'mb-3 text-center';
+      simplifyContainer.appendChild(header);
+      const row = document.createElement('div');
+      // Centra le carte orizzontalmente per un layout più armonioso
+      row.className = 'row justify-content-center';
+      // For each item create a column with card
+      items.forEach(function(item) {
+        const col = document.createElement('div');
+        col.className = 'col-6 col-sm-4 col-md-3 col-lg-2 mb-3';
+        const card = document.createElement('div');
+        card.className = 'simplify-card card shadow-sm d-flex align-items-center justify-content-center text-center h-100';
+        card.style.cursor = 'pointer';
+        card.textContent = formatter ? formatter(item) : (item || '--');
+        card.addEventListener('click', function() { onClickItem(item); });
+        col.appendChild(card);
+        row.appendChild(col);
+      });
+      simplifyContainer.appendChild(row);
+    }
+
+    function showMaterialStep() {
+      // Unique materials (non-empty)
+      const mats = Array.from(new Set(materialsData.map(d => d.materiale || '').filter(m => m)));
+      // Sort alphabetically
+      mats.sort((a,b) => a.localeCompare(b));
+      // Clear container and add a back button to exit quick search
+      simplifyContainer.innerHTML = '';
+      const backBtn = document.createElement('button');
+      backBtn.className = 'btn btn-link mb-3';
+      backBtn.innerHTML = '&larr; Indietro';
+      backBtn.addEventListener('click', function() {
+        // Exits quick search mode
+        deactivateSimplify();
+      });
+      simplifyContainer.appendChild(backBtn);
+      // Heading
+      const header = document.createElement('h4');
+      header.textContent = 'Scegli il materiale';
+      header.className = 'mb-3 text-center';
+      simplifyContainer.appendChild(header);
+      // Grid row
+      const rowDiv = document.createElement('div');
+      rowDiv.className = 'row justify-content-center';
+      mats.forEach(function(mat) {
+        const col = document.createElement('div');
+        col.className = 'col-6 col-sm-4 col-md-3 col-lg-2 mb-3';
+        const card = document.createElement('div');
+        card.className = 'simplify-card card shadow-sm d-flex align-items-center justify-content-center text-center h-100';
+        card.style.cursor = 'pointer';
+        card.textContent = mat || '--';
+        card.addEventListener('click', function() {
+          selectedMaterial = mat;
+          selectedTipo = null;
+          selectedSpessore = null;
+          selectedProduttore = null;
+          showTipoStep();
+        });
+        col.appendChild(card);
+        rowDiv.appendChild(col);
+      });
+      simplifyContainer.appendChild(rowDiv);
+    }
+
+    function showTipoStep() {
+      // Unique types for selected material
+      const tipi = Array.from(new Set(materialsData.filter(d => d.materiale === selectedMaterial).map(d => d.tipo || '').filter(t => t)));
+      tipi.sort((a,b) => a.localeCompare(b));
+      // If there's only one type or none, jump to next step automatically
+      if (tipi.length === 0) {
+        selectedTipo = '';
+        showSpessoreStep();
+        return;
+      }
+      // Prepend a back button row if previous step exists
+      simplifyContainer.innerHTML = '';
+      const backBtn = document.createElement('button');
+      backBtn.className = 'btn btn-link mb-3';
+      backBtn.innerHTML = '&larr; Indietro';
+      backBtn.addEventListener('click', function() {
+        selectedMaterial = null;
+        showMaterialStep();
+      });
+      simplifyContainer.appendChild(backBtn);
+      showStep('Scegli il tipo', tipi, function(tp) {
+        selectedTipo = tp;
+        selectedSpessore = null;
+        selectedProduttore = null;
+        showSpessoreStep();
+      });
+    }
+
+    function showSpessoreStep() {
+      // Unique spessore for selected material and tipo
+      const spessori = Array.from(new Set(materialsData.filter(d => d.materiale === selectedMaterial && (selectedTipo ? d.tipo === selectedTipo : true)).map(d => d.spessore || '').filter(s => s)));
+      spessori.sort((a,b) => a.localeCompare(b));
+      if (spessori.length === 0) {
+        selectedSpessore = '';
+        showProduttoreStep();
+        return;
+      }
+      simplifyContainer.innerHTML = '';
+      // Back button to Tipo step
+      const backBtn = document.createElement('button');
+      backBtn.className = 'btn btn-link mb-3';
+      backBtn.innerHTML = '&larr; Indietro';
+      backBtn.addEventListener('click', function() {
+        showTipoStep();
+      });
+      simplifyContainer.appendChild(backBtn);
+      showStep('Scegli lo spessore', spessori, function(sp) {
+        selectedSpessore = sp;
+        selectedProduttore = null;
+        showProduttoreStep();
+      });
+    }
+
+    function showProduttoreStep() {
+      // Unique produttori for selected conditions
+      const prodList = Array.from(new Set(materialsData.filter(d => {
+        return d.materiale === selectedMaterial &&
+               (selectedTipo ? d.tipo === selectedTipo : true) &&
+               (selectedSpessore ? d.spessore === selectedSpessore : true);
+      }).map(d => d.produttore || '').filter(p => p)));
+      prodList.sort((a,b) => a.localeCompare(b));
+      // If there are no producers, skip to results
+      if (prodList.length === 0) {
+        selectedProduttore = '';
+        showResults();
+        return;
+      }
+      simplifyContainer.innerHTML = '';
+      // Back button to Spessore step
+      const backBtn = document.createElement('button');
+      backBtn.className = 'btn btn-link mb-3';
+      backBtn.innerHTML = '&larr; Indietro';
+      backBtn.addEventListener('click', function() {
+        showSpessoreStep();
+      });
+      simplifyContainer.appendChild(backBtn);
+      showStep('Scegli il produttore', prodList, function(prod) {
+        selectedProduttore = prod;
+        showResults();
+      });
+    }
+
+    function showResults() {
+      // Filter materialsData according to selected conditions
+      const results = materialsData.filter(d => {
+        return d.materiale === selectedMaterial &&
+               (selectedTipo ? d.tipo === selectedTipo : true) &&
+               (selectedSpessore ? d.spessore === selectedSpessore : true) &&
+               (selectedProduttore ? d.produttore === selectedProduttore : true);
+      });
+      simplifyContainer.innerHTML = '';
+      // Back button to Produttore step
+      const backBtn = document.createElement('button');
+      backBtn.className = 'btn btn-link mb-3';
+      backBtn.innerHTML = '&larr; Indietro';
+      backBtn.addEventListener('click', function() {
+        // If we have producers list, go back to producer selection; otherwise spessore step
+        // Determine if any producer available
+        const hasProd = materialsData.some(d => d.materiale === selectedMaterial &&
+          (selectedTipo ? d.tipo === selectedTipo : true) &&
+          (selectedSpessore ? d.spessore === selectedSpessore : true) &&
+          d.produttore);
+        if (hasProd) {
+          showProduttoreStep();
+        } else {
+          showSpessoreStep();
+        }
+      });
+      simplifyContainer.appendChild(backBtn);
+      const header = document.createElement('h4');
+      header.textContent = 'Lastre trovate (' + results.length + ')';
+      header.className = 'mb-3';
+      simplifyContainer.appendChild(header);
+      if (results.length === 0) {
+        const p = document.createElement('p');
+        p.textContent = 'Nessuna lastra trovata per la combinazione selezionata.';
+        simplifyContainer.appendChild(p);
+        return;
+      }
+      // Create a table similar to the dashboard table but simplified
+      const table = document.createElement('table');
+      table.className = 'table table-striped table-hover align-middle';
+      const thead = document.createElement('thead');
+      const headRow = document.createElement('tr');
+      const cols = ['ID', 'Materiale', 'Tipo', 'Spessore', 'Produttore', 'Quantità', 'Ubicazione', 'Sfrido', 'Dettagli', 'Prenota'];
+      cols.forEach(function(c) {
+        const th = document.createElement('th');
+        th.textContent = c;
+        headRow.appendChild(th);
+      });
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+      const tbody = document.createElement('tbody');
+      results.forEach(function(row) {
+        const tr = document.createElement('tr');
+        // ID
+        let td = document.createElement('td');
+        td.textContent = row.id;
+        tr.appendChild(td);
+        // Materiale
+        td = document.createElement('td');
+        td.textContent = row.materiale || '--';
+        tr.appendChild(td);
+        // Tipo
+        td = document.createElement('td');
+        td.textContent = row.tipo || '--';
+        tr.appendChild(td);
+        // Spessore
+        td = document.createElement('td');
+        td.textContent = row.spessore || '--';
+        tr.appendChild(td);
+        // Produttore
+        td = document.createElement('td');
+        td.textContent = row.produttore || '--';
+        tr.appendChild(td);
+        // Quantità
+        td = document.createElement('td');
+        td.textContent = row.quantita;
+        tr.appendChild(td);
+        // Ubicazione (lettera-numero)
+        td = document.createElement('td');
+        const locStr = (row.ubicazione_lettera ? row.ubicazione_lettera : '') + (row.ubicazione_numero ? '-' + row.ubicazione_numero : '');
+        td.textContent = locStr || '--';
+        tr.appendChild(td);
+        // Sfrido
+        td = document.createElement('td');
+        td.textContent = row.is_sfrido ? 'Sì' : 'No';
+        tr.appendChild(td);
+        // Azione: Dettagli bancale
+        const tdDet = document.createElement('td');
+        const btnDet = document.createElement('a');
+        btnDet.className = 'btn btn-sm btn-secondary';
+        btnDet.textContent = 'Dettagli bancale';
+        // Determina l'ID del bancale: se la riga è un bancale usa il suo ID,
+        // altrimenti usa parent_id se presente; se parent_id è nullo torna all'ID.
+        const palletId = row.is_pallet ? row.id : (row.parent_id !== null && row.parent_id !== undefined ? row.parent_id : row.id);
+        btnDet.href = '/materiale/' + palletId;
+        tdDet.appendChild(btnDet);
+        tr.appendChild(tdDet);
+        // Prenota: se la lastra non è già prenotata mostra un pulsante per
+        // effettuare la prenotazione; altrimenti mostra un bottone disabilitato.
+        const tdPren = document.createElement('td');
+        const isReserved = reservedIds && Array.isArray(reservedIds) ? reservedIds.includes(row.id) : false;
+        const btnPren = document.createElement('a');
+        btnPren.className = 'btn btn-sm ' + (isReserved ? 'btn-secondary disabled' : 'btn-warning');
+        btnPren.textContent = isReserved ? 'Prenotata' : 'Prenota';
+        if (!isReserved) {
+          btnPren.href = '/prenota/' + row.id;
+        } else {
+          btnPren.setAttribute('aria-disabled', 'true');
+        }
+        tdPren.appendChild(btnPren);
+        tr.appendChild(tdPren);
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      simplifyContainer.appendChild(table);
+    }
+
+    function activateSimplify() {
+      simplifyMode = true;
+      // Hide the default UI components
+      filterForm?.classList.add('d-none');
+      tableContainer?.classList.add('d-none');
+      moveBtn?.classList.add('d-none');
+      moveBar?.classList.add('d-none');
+      // Show simplify container and initialize first step
+      simplifyContainer?.classList.remove('d-none');
+      selectedMaterial = null;
+      selectedTipo = null;
+      selectedSpessore = null;
+      selectedProduttore = null;
+      // Aggiorna lo stato del toggle: assicurati che sia selezionato
+      if (simplifyToggle) simplifyToggle.checked = true;
+      showMaterialStep();
+    }
+
+    function deactivateSimplify() {
+      simplifyMode = false;
+      // Show default UI components
+      filterForm?.classList.remove('d-none');
+      tableContainer?.classList.remove('d-none');
+      moveBtn?.classList.remove('d-none');
+      // If move mode is active the bar will be controlled by existing script
+      // Hide simplify container
+      simplifyContainer?.classList.add('d-none');
+      // Aggiorna lo stato del toggle: assicurati che sia deselezionato
+      if (simplifyToggle) simplifyToggle.checked = false;
+    }
+    // Gestisci il cambiamento dell'interruttore per la ricerca rapida.
+    simplifyToggle?.addEventListener('change', function() {
+      if (this.checked) {
+        activateSimplify();
+      } else {
+        deactivateSimplify();
+      }
+    });
+  });
+</script>
+{% endblock %}

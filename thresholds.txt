@@ -1,0 +1,5 @@
+# Soglie per avviso e riordino nel magazzino
+# Modifica questi valori per personalizzare gli avvisi.
+
+avviso=0
+riordino=3

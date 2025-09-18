@@ -1,0 +1,13 @@
+{
+  "host": "192.168.100.23",
+  "port": 9100,
+  
+  "label_width_mm": 38,
+  "label_height_mm": 22,
+  "resolution_dpi": 203,
+
+  "qr_module_size": 6,
+
+  "font_height": 60,
+  "font_width": 20
+}

@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-lg">
+    <h2>Magazzino Live</h2>
+    <p class="mb-3">Elenco delle prenotazioni attive.</p>
+    {% if not reservations %}
+        <div class="alert alert-info">Non ci sono prenotazioni attive.</div>
+    {% else %}
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>ID materiale</th>
+                    <th>Tipo prenotazione</th>
+                    <th>N°Bancale</th>
+                    <th>Materiale</th>
+                    <th>Spessore</th>
+                    <!-- Nuove colonne per le dimensioni X e Y della lastra prenotata -->
+                    <th>Dim&nbsp;X</th>
+                    <th>Dim&nbsp;Y</th>
+                    <th>Ubicazione</th>
+                    <th>Macchina</th>
+                    <th>Scadenza</th>
+                    <th>Stato</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in reservations %}
+                <tr style="background-color: {{ r.color }};">
+                    {#
+                    Visualizza l'ID della prenotazione solo se la prenotazione è specifica.
+                    Per le prenotazioni generiche l'ID viene nascosto, mostrando un trattino per
+                    mantenere l'allineamento della tabella.
+                    #}
+                    <td>{% if not r.is_generic %}{{ r.id }}{% else %}—{% endif %}</td>
+                    <td>{% if r.is_generic %}Generica{% else %}Specifica{% endif %}</td>
+                    {# Colonna N°Bancale: mostra l'ID del bancale se disponibile, altrimenti un trattino #}
+                    <td>{% if r.bancale_id %}{{ r.bancale_id }}{% else %}&mdash;{% endif %}</td>
+                    <td data-bs-toggle="tooltip" data-bs-placement="top" title="{{ r.note if r.note else '' }}">{{ r.materiale }}</td>
+                    <td>{{ r.spessore if r.spessore else '--' }}</td>
+                    <td>{{ r.dimensione_x if r.dimensione_x else '--' }}</td>
+                    <td>{{ r.dimensione_y if r.dimensione_y else '--' }}</td>
+                    <td>{{ r.ubicazione_lettera }}-{{ r.ubicazione_numero }}</td>
+                    <td>{{ r.macchina_nome if r.macchina_nome else '--' }}</td>
+                    <td>{{ r.due.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td class="text-center">
+                        <span class="semaforo semaforo-{{ r.status }}"></span>
+                    </td>
+                    <td>
+                        {# Mostra il pulsante di cancellazione prenotazione solo agli utenti
+                           che dispongono della scheda "Anagrafiche articoli" (config).  Se
+                           l'utente non possiede questo permesso la colonna resta
+                           vuota. #}
+                        {% if 'config' in session.get('allowed_tabs', []) %}
+                        <form method="post" action="{{ url_for('delete_prenotazione', pren_id=r.pren_id) }}" onsubmit="return confirm('Eliminare questa prenotazione?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Cancella</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {# Sezione accettazione: mostra i materiali in attesa di accettazione con informazioni dettagliate #}
+    {% if accettazioni and accettazioni|length > 0 %}
+    <h3 class="mt-5">Accettazione</h3>
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th class="text-nowrap">Data</th>
+                    <th class="text-nowrap">N°Ordine</th>
+                    <th class="text-center text-nowrap">Materiale</th>
+                    <th class="text-nowrap">Tipo</th>
+                    <th class="text-nowrap">Spessore</th>
+                    <th class="text-nowrap">Dim&nbsp;X</th>
+                    <th class="text-nowrap">Dim&nbsp;Y</th>
+                    <th class="text-nowrap">Q.tà&nbsp;totale</th>
+                    <th class="text-nowrap">Q.tà&nbsp;ricevuta</th>
+                    <th class="text-nowrap">Data&nbsp;prevista</th>
+                    <th class="text-nowrap">Produttore</th>
+                    <th class="text-nowrap">Fornitore</th>
+                    <th class="text-nowrap">Stato</th>
+                    <th class="text-nowrap">Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in accettazioni %}
+                <tr>
+                    <td>{{ a.data.split(' ')[0] if a.data else a.data }}</td>
+                    <td>{{ a.numero_ordine if a.numero_ordine else '—' }}</td>
+                    <td>{{ a.materiale }}</td>
+                    <td>{{ a.tipo if a.tipo else '—' }}</td>
+                    <td>{{ a.spessore if a.spessore else '—' }}</td>
+                    <td>{{ a.dimensione_x if a.dimensione_x else '—' }}</td>
+                    <td>{{ a.dimensione_y if a.dimensione_y else '—' }}</td>
+                    <td>{{ a.quantita_totale }}</td>
+                    <td>{{ a.quantita_ricevuta }}</td>
+                    <td>{{ a.data_prevista if a.data_prevista else '—' }}</td>
+                    <td>
+                        {#
+                            Visualizza sempre il produttore scelto per questa consegna come testo.
+                            Non consentire la modifica del produttore in fase di accettazione live.
+                            Si visualizza prima il produttore associato alla singola consegna
+                            (campo ``a.produttore``); se non presente si utilizza
+                            ``a.produttore_scelto`` proveniente dall'ordine.
+                        #}
+                        {% set prod_to_show = a.produttore if a.produttore else (a.produttore_scelto if a.produttore_scelto else None) %}
+                        {{ prod_to_show if prod_to_show else '—' }}
+                    </td>
+                    <td>
+                        {#
+                            Visualizza sempre il fornitore scelto (se presente) come testo non modificabile.
+                            Se il fornitore non è ancora stato scelto, ma l'elenco contiene un solo elemento,
+                            mostra direttamente quell'unico nome.  Solo nel caso in cui non vi sia ancora
+                            un fornitore selezionato e ci siano più opzioni disponibili, consenti la scelta
+                            tramite select.  In questo modo l'accettazione riprende correttamente
+                            il fornitore scelto nell'RDO e non permette più la modifica.
+                            Per gli ordini manuali (senza lista fornitori), se la colonna
+                            "fornitore" della riga di accettazione è valorizzata, visualizza
+                            tale valore.
+                        #}
+                        {#
+                            Mostra il fornitore in base alle seguenti priorità:
+                            1. Se è stato scelto un fornitore tramite RDO (``fornitore_scelto``), visualizzarlo.
+                            2. Se la riga di accettazione ha un fornitore esplicito (campo ``fornitore``), visualizzarlo anche se
+                               l'elenco fornitori contiene più opzioni (caso di ordini manuali salvati con un fornitore).
+                            3. Se non c'è fornitore scelto ma l'elenco dei fornitori contiene al massimo un elemento,
+                               mostrare quell'unico nome se esiste, altrimenti lasciare un trattino.
+                            4. Solo se non esiste alcun fornitore preimpostato e ci sono più opzioni disponibili,
+                               consentire la selezione tramite una tendina.
+                        #}
+                        {% if a.fornitore_scelto %}
+                            {{ a.fornitore_scelto }}
+                        {% elif a.fornitore %}
+                            {{ a.fornitore }}
+                        {% elif a.fornitori|length <= 1 %}
+                            {% if a.fornitori %}
+                                {{ a.fornitori[0] }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        {% else %}
+                            <select class="form-select form-select-sm forn-select" data-order="{{ a.numero_ordine }}">
+                                <option value="" disabled selected>Seleziona...</option>
+                                {% for f in a.fornitori %}
+                                <option value="{{ f }}">{{ f }}</option>
+                                {% endfor %}
+                            </select>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>{{ a.quantita_ricevuta }}/{{ a.quantita_totale }} accettati</span>
+                            <div class="progress ms-2 flex-grow-1" style="width: 100%;">
+                                <div class="progress-bar" role="progressbar" style="width: {{ a.progress_pct }}%" aria-valuenow="{{ a.progress_pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <form class="d-flex flex-column flex-sm-row gap-2 align-items-start align-items-sm-center accept-form" method="POST" action="{{ url_for('accettazione_update', acc_id=a.id) }}">
+                            <div class="d-flex gap-1 align-items-center">
+                                <input type="number" name="quantita" id="quantita-live-{{ loop.index0 }}" class="form-control form-control-sm" min="1" max="{{ a.residuo }}" value="{{ a.residuo }}" style="width: 6rem;" />
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm">Accetta</button>
+                            <small class="form-text text-muted">Residuo: {{ a.residuo }}</small>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <a class="btn btn-secondary mt-3" href="{{ url_for('dashboard') }}">Dashboard</a>
+</div>
+<!-- Aggiorna automaticamente la pagina ogni 60 secondi per mostrare lo stato
+     aggiornato delle prenotazioni.  Utilizziamo setTimeout anziché
+     setInterval per evitare sovrapposizioni nel caso in cui il refresh
+     sia lento.  L'utente può comunque navigare via il link in alto. -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+      // Ricarica la pagina solo se l'utente è ancora su /live
+      if (window.location.pathname.endsWith('/live')) {
+        window.location.reload();
+      }
+    }, 60000); // 60.000 ms = 60 secondi
+  });
+</script>
+<script>
+// Gestione selezione fornitore nella vista live
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.forn-select').forEach(function(sel) {
+    sel.addEventListener('change', function() {
+      const orderNum = this.getAttribute('data-order');
+      const selected = this.value;
+      if (!orderNum || !selected) {
+        return;
+      }
+      if (!confirm('Vuoi confermare il fornitore selezionato?')) {
+        this.selectedIndex = 0;
+        return;
+      }
+      fetch('{{ url_for("set_fornitore_ordine") }}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ numero_ordine: orderNum, fornitore: selected })
+      }).then(function(response) { return response.json(); }).then(function(data) {
+        if (data && data.success) {
+          window.location.reload();
+        } else {
+          alert(data.error || data.message || 'Errore durante il salvataggio');
+          sel.selectedIndex = 0;
+        }
+      }).catch(function() {
+        alert('Errore di rete');
+        sel.selectedIndex = 0;
+      });
+    });
+  });
+});
+</script>
+<script>
+// Gestione selezione produttore nella vista live
+// Aggiungiamo un event listener per gli elementi con classe `.prod-select`:
+// quando l'utente seleziona un produttore dalla tendina, viene inviato
+// un request JSON all'endpoint `set_produttore_ordine` per salvare la scelta.
+// Se il salvataggio va a buon fine la pagina viene ricaricata, altrimenti
+// viene mostrato un messaggio di errore e la selezione viene resettata.
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.prod-select').forEach(function(sel) {
+    sel.addEventListener('change', function() {
+      const orderNum = this.getAttribute('data-order');
+      const selected = this.value;
+      if (!orderNum || !selected) {
+        return;
+      }
+      if (!confirm('Vuoi confermare il produttore selezionato?')) {
+        this.selectedIndex = 0;
+        return;
+      }
+      fetch('{{ url_for("set_produttore_ordine") }}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ numero_ordine: orderNum, produttore: selected })
+      }).then(function(response) { return response.json(); }).then(function(data) {
+        if (data && data.success) {
+          window.location.reload();
+        } else {
+          alert(data.error || data.message || 'Errore durante il salvataggio');
+          sel.selectedIndex = 0;
+        }
+      }).catch(function() {
+        alert('Errore di rete');
+        sel.selectedIndex = 0;
+      });
+    });
+  });
+});
+</script>
+{# Script accetta residuo rimosso #}
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1 class="mb-4">Storico dei materiali</h1>
+<!-- Form di filtro per lo storico -->
+<form method="get" class="row g-3 mb-4">
+    <div class="col-auto">
+        <input type="text" class="form-control" name="id_filter" placeholder="ID" value="{{ id_filter }}">
+    </div>
+    <div class="col-auto">
+        <select class="form-select" name="event_type">
+            <option value="">Evento</option>
+            {% set ev_types = ['aggiunto', 'spostato', 'rimosso', 'sfrido', 'prenotato', 'prenotazione_cancellata', 'modificato'] %}
+            {% for et in ev_types %}
+            <option value="{{ et }}" {% if event_filter == et %}selected{% endif %}>{{ et }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-auto">
+        <input type="text" class="form-control" name="materiale" placeholder="Materiale" value="{{ materiale_filter }}">
+    </div>
+    <div class="col-auto">
+        <input type="text" class="form-control" name="tipo" placeholder="Tipo" value="{{ tipo_filter }}">
+    </div>
+    <div class="col-auto">
+        <input type="text" class="form-control" name="fornitore" placeholder="Fornitore" value="{{ fornitore_filter }}">
+    </div>
+    <div class="col-auto">
+        <input type="text" class="form-control" name="produttore" placeholder="Produttore" value="{{ produttore_filter }}">
+    </div>
+    <div class="col-auto">
+        <input type="text" class="form-control" name="spessore" placeholder="Spessore" value="{{ spessore_filter }}">
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Filtra</button>
+        <a href="{{ url_for('storico') }}" class="btn btn-secondary">Reset</a>
+    </div>
+</form>
+<div class="accordion" id="historyAccordion">
+    {% for slab in history %}
+    <div class="accordion-item">
+        <h2 class="accordion-header" id="heading{{ loop.index }}">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}" aria-expanded="false" aria-controls="collapse{{ loop.index }}">
+                ID {{ slab.id }} – {{ slab.materiale }}{% if slab.tipo %} / {{ slab.tipo }}{% endif %}{% if slab.spessore %} / {{ slab.spessore }}{% endif %} ({{ slab.dimensione_x }}×{{ slab.dimensione_y }})
+            </button>
+        </h2>
+        <div id="collapse{{ loop.index }}" class="accordion-collapse collapse" aria-labelledby="heading{{ loop.index }}" data-bs-parent="#historyAccordion">
+            <div class="accordion-body">
+                {# Sezione rimossa: i pulsanti vengono mostrati a livello di evento #}
+                <table class="table table-sm table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th scope="col">Data/Ora</th>
+                            <th scope="col">Evento</th>
+                            <th scope="col">Da</th>
+                            <th scope="col">A</th>
+                            <th scope="col">Utente</th>
+                            <th scope="col">Dimensioni</th>
+                            <th scope="col">Spessore</th>
+                            <th scope="col">Materiale</th>
+                            <th scope="col">Tipo</th>
+                            <th scope="col">Fornitore</th>
+                            <th scope="col">Produttore</th>
+                            <th scope="col">Documenti ID</th>
+                            <th scope="col">Nesting</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ev in slab.events %}
+                        <tr>
+                            <td>{{ ev.timestamp }}</td>
+                            <td>{{ ev.event_type }}</td>
+                            <td>{{ ev.from_location or '' }}</td>
+                            <td>{{ ev.to_location or '' }}</td>
+                            <td>{{ ev.user }}</td>
+                            <td>{{ ev.dimensione_x }}×{{ ev.dimensione_y }}</td>
+                            <td>{{ ev.spessore }}</td>
+                            <td>{{ ev.materiale }}</td>
+                            <td>{{ ev.tipo or '' }}</td>
+                            <td>{{ ev.fornitore or '' }}</td>
+                            <td>{{ ev.produttore or '' }}</td>
+                            <td>
+                                <!-- Colonna Documenti ID: link per aprire la pagina dei documenti -->
+                                <a href="{{ url_for('view_docs', material_id=slab.id) }}" target="_blank" class="btn btn-sm btn-outline-info">Documenti</a>
+                            </td>
+                            <td>
+                                {# Pulsante per aprire la cartella di nesting #}
+                                {% if ev.nesting_link %}
+                                    <a href="{{ ev.nesting_link }}" target="_blank" class="btn btn-sm btn-outline-primary">Cartella nesting</a>
+                                {% else %}
+                                    <span class="btn btn-sm btn-outline-secondary disabled">Cartella nesting</span>
+                                {% endif %}
+                                {# Pulsante "Link nesting" visibile solo agli utenti con permesso "accessi" (scheda Admin) #}
+                                {% if 'accessi' in session.get('allowed_tabs', []) %}
+                                    <a href="{{ url_for('edit_nesting', slab_id=slab.id) }}" class="btn btn-sm btn-outline-warning ms-1">Link nesting</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% if total_pages and total_pages > 1 %}
+<nav aria-label="Storico pagination" class="mt-3">
+    <ul class="pagination">
+        {% for p in range(1, total_pages + 1) %}
+        <li class="page-item {% if p == page %}active{% endif %}">
+            <a class="page-link" href="{{ url_for('storico', page=p, id_filter=id_filter, event_type=event_filter, materiale=materiale_filter, tipo=tipo_filter, fornitore=fornitore_filter, produttore=produttore_filter, spessore=spessore_filter) }}">{{ p }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

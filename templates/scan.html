@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-lg text-center">
+    <h2>Scarico materiale tramite QR</h2>
+    {#
+      Inseriamo un toggle visibile per la modalità "Aggiungi sfrido".  Quando
+      attivato, la scansione del QR non eliminerà immediatamente il
+      materiale ma proporrà di registrare uno sfrido recuperando l'ID
+      scansionato.  Lo switch è ingrandito tramite CSS inline per
+      facilitarne l'utilizzo da dispositivi mobili.
+    #}
+    <div class="form-check form-switch d-flex justify-content-center align-items-center mb-3">
+        <input class="form-check-input" type="checkbox" id="sfrido-toggle" style="transform: scale(1.5);" />
+        <label class="form-check-label ms-2" for="sfrido-toggle" style="font-size: 1.2rem;">
+            Aggiungi sfrido
+        </label>
+    </div>
+    {# Rimuoviamo lo stile inline che impone un limite massimo di larghezza al lettore QR.
+       La nuova regola CSS nel file style.css gestirà la larghezza in modo responsivo. #}
+    <div class="mb-3 mx-auto" id="reader"></div>
+    {#
+      Il form per la rimozione non ha più un messaggio di conferma fisso.  La conferma
+      verrà impostata dinamicamente in base all'ID scansionato tramite JavaScript.
+    #}
+    <form id="remove-form" method="POST" action="{{ url_for('remove_material') }}" style="display:none;">
+        <input type="hidden" id="material_id" name="material_id">
+        <button type="submit" class="btn btn-danger">Conferma rimozione</button>
+    </form>
+    <a class="btn btn-secondary mt-3" href="{{ url_for('dashboard') }}">Dashboard</a>
+</div>
+<!-- Carica la libreria per la lettura dei QR code da CDN -->
+<script src="https://unpkg.com/html5-qrcode"></script>
+    <script>
+        // Funzione chiamata ad ogni scansione riuscita del QR code.  Recupera
+        // le informazioni del materiale corrispondente all'ID scansionato
+        // tramite un endpoint JSON e imposta un messaggio di conferma
+        // personalizzato prima della rimozione.
+        async function onScanSuccess(decodedText) {
+            // Normalizza l'ID rimuovendo spazi indesiderati
+            const id = decodedText.trim();
+            // Controlla se l'utente ha attivato la modalità sfrido tramite il toggle
+            const sfridoToggle = document.getElementById('sfrido-toggle');
+            if (sfridoToggle && sfridoToggle.checked) {
+                // In modalità sfrido verifichiamo se la lastra esiste ancora nel magazzino.
+                // Se esiste (material_info restituisce un 2xx), non è possibile creare uno sfrido.
+                try {
+                    const checkRes = await fetch(`/material_info/${encodeURIComponent(id)}`);
+                    if (checkRes.ok) {
+                        alert('Questo materiale è ancora presente in magazzino. Rimuoverlo prima di generare uno sfrido.');
+                        return;
+                    }
+                } catch (e) {
+                    // Ignoriamo gli errori di rete: se non riceviamo una risposta valida
+                    // assumiamo che il materiale non sia presente (è stato rimosso).
+                }
+                // Chiedi conferma per la registrazione dello sfrido e reindirizza
+                if (confirm('Vuoi registrare uno sfrido per ' + id + '?')) {
+                    window.location.href = `/sfrido/${encodeURIComponent(id)}`;
+                }
+                return;
+            }
+            // Comportamento standard di rimozione
+            let msg = 'Vuoi eliminare ' + id + '?';
+            try {
+                const res = await fetch(`/material_info/${encodeURIComponent(id)}`);
+                const result = await res.json();
+                if (result && result.success && result.data) {
+                    const d = result.data;
+                    msg = `Vuoi eliminare \"${d.id} - ${d.materiale} - ${d.dimensione_x} - ${d.dimensione_y} - ${d.spessore}\"?`;
+                }
+            } catch (err) {
+                // In caso di errore di rete o parsing, usa il messaggio predefinito
+            }
+            const form = document.getElementById('remove-form');
+            form.onsubmit = function() {
+                return confirm(msg);
+            };
+            document.getElementById('material_id').value = id;
+            form.style.display = 'block';
+        }
+        // Inizializza lo scanner QR: 10 fps e box di 250px
+        const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+        html5QrcodeScanner.render(onScanSuccess);
+    </script>
+{% endblock %}

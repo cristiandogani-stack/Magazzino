@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{#
+  Pagina di conferma per l'inserimento in una ubicazione già occupata.
+
+  Quando l'utente tenta di aggiungere un nuovo bancale o una o più lastre
+  in una posizione di magazzino che contiene già materiale diverso, il
+  server reindirizza qui per richiedere una conferma esplicita.  La
+  variabile ``existing_materiale`` contiene il nome del materiale
+  attualmente presente nell'ubicazione, mentre ``form_data`` è un
+  dizionario con tutti i valori del modulo di inserimento originario.
+
+  Se l'utente sceglie di proseguire, tutti i campi del modulo vengono
+  reinviati insieme al flag ``confirm_override`` a indicare che la
+  conferma è stata fornita e che il controllo può essere saltato.
+  In alternativa, l'utente può annullare e tornare alla schermata di
+  inserimento per selezionare un'altra ubicazione.
+#}
+
+{% block content %}
+<div class="container-lg">
+    <h2>Conferma ubicazione occupata</h2>
+    <div class="alert alert-warning" role="alert">
+        L'ubicazione <strong>{{ form_data['ubicazione_lettera'] }}{{ form_data['ubicazione_numero'] }}</strong>
+        contiene già il materiale <strong>{{ existing_materiale }}</strong>.<br>
+        Stai per aggiungere il materiale <strong>{{ form_data['materiale'] }}</strong> nella stessa posizione.
+        <br>
+        Vuoi procedere comunque o preferisci scegliere un'altra ubicazione?
+    </div>
+    <form method="POST" action="{{ url_for('add') }}">
+        {% for key, value in form_data.items() %}
+            {# Ripristina tutti i valori del form originale eccetto eventuali flag di conferma #}
+            {% if key != 'confirm_override' %}
+                <input type="hidden" name="{{ key }}" value="{{ value }}">
+            {% endif %}
+        {% endfor %}
+        <input type="hidden" name="confirm_override" value="1">
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-warning">Aggiungi comunque</button>
+            <a href="{{ url_for('add') }}" class="btn btn-secondary">Scegli altra ubicazione</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

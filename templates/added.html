@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-lg">
+    <h2 class="mb-4">QR generati</h2>
+    <p class="text-muted">Di seguito trovi i codici QR per le lastre appena inserite. Puoi scaricarli o stamparli direttamente per etichettare il materiale.</p>
+
+    {# Pulsante per stampare in un unico PDF tutti i QR appena creati #}
+    {% if created %}
+    <div class="d-flex justify-content-end mb-3">
+        {# Pulsante per la stampa diretta di tutte le etichette appena create.  
+           Chiede conferma prima di inviare le etichette alla stampante Zebra.
+         #}
+        <button class="btn btn-success" type="button" onclick="if (confirm('Vuoi stampare tutte le etichette?')) { window.location.href='{{ url_for('print_labels') }}?ids={{ pdf_ids }}'; }">Stampa tutti</button>
+    </div>
+    {# Se esistono dei bancali, mostra pulsanti documenti per bancale in cima #}
+    {% if pallet_ids %}
+    <div class="mb-4">
+        <h5 class="mb-2">Documenti bancale</h5>
+        <div class="d-flex flex-wrap gap-2">
+            {% for pid in pallet_ids %}
+            <button class="btn btn-info btn-lg" type="button" data-bs-toggle="modal" data-bs-target="#palletDocsModal{{ pid }}">
+                Bancale {{ pid }}{% if attachments_pallet_map and attachments_pallet_map.get(pid) %} ({{ attachments_pallet_map[pid]|length }}){% endif %}
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+        {% for m in created %}
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="card-title">ID {{ m['id'] }}</h6>
+                    <p class="card-text mb-1"><strong>Ubicazione:</strong> {{ m['ubicazione_lettera'] }}-{{ m['ubicazione_numero'] }}</p>
+                    <p class="card-text mb-1"><strong>Materiale:</strong> {{ m['materiale'] }}</p>
+                    <p class="card-text mb-1"><strong>Spessore:</strong> {{ m['spessore'] if m['spessore'] else '--' }}</p>
+                    <p class="card-text mb-2"><strong>Sfrido:</strong> {% if m['is_sfrido'] %}Sì{% else %}No{% endif %}</p>
+                    <img src="{{ url_for('qr_code', material_id=m['id']) }}" alt="QR" class="qr-img" style="width:160px; height:160px;">
+                    <div class="mt-3 d-grid gap-2">
+                        {# Pulsante di stampa: invia direttamente alla stampante Zebra l'etichetta del materiale #}
+                        <button class="btn btn-sm btn-outline-secondary" type="button" onclick="window.location.href='{{ url_for('print_label', material_id=m['id']) }}';">Stampa</button>
+                        {# Pulsante per visualizzare e caricare i documenti associati alla lastra #}
+                        <button class="btn btn-sm btn-info" type="button" data-bs-toggle="modal" data-bs-target="#docsModal{{ m['id'] }}">
+                            Docs{% if attachments_map and attachments_map[m['id']] %} ({{ attachments_map[m['id']]|length }}){% endif %}
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <!-- Modal per la gestione dei documenti della lastra appena creata -->
+            <div class="modal fade" id="docsModal{{ m['id'] }}" tabindex="-1" aria-labelledby="docsModalLabel{{ m['id'] }}" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="docsModalLabel{{ m['id'] }}">Documenti materiale ID {{ m['id'] }}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+                        </div>
+                        <div class="modal-body">
+                            {% set docs = attachments_map.get(m['id'], []) %}
+                            {% if docs %}
+                            <ul class="list-group mb-3">
+                                {% for d in docs %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <a href="{{ url_for('download_doc', doc_id=d['id']) }}" target="_blank">{{ d['original_name'] }}</a>
+                                    </div>
+                                    <form method="post" action="{{ url_for('delete_doc', doc_id=d['id']) }}" onsubmit="return confirm('Eliminare questo documento?');" class="ms-3">
+                                        {# Usa request.full_path invece di request.url per evitare redirect verso host non raggiungibili (es. 0.0.0.0) #}
+                                        <input type="hidden" name="next" value="{{ request.full_path }}">
+                                        <button class="btn btn-sm btn-danger" type="submit">Elimina</button>
+                                    </form>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            {% else %}
+                            <p>Nessun documento caricato.</p>
+                            {% endif %}
+                            <form id="docForm{{ m['id'] }}" method="post" action="{{ url_for('upload_docs', material_id=m['id']) }}" enctype="multipart/form-data">
+                                <input type="hidden" name="next" value="{{ request.full_path }}">
+                                <div class="mb-3">
+                                    <label for="docsFile{{ m['id'] }}" class="form-label">Carica documenti (PNG, JPG, JPEG, PDF)</label>
+                                    <input class="form-control mb-2" type="file" id="docsFile{{ m['id'] }}" name="documents" multiple accept="image/*,.pdf">
+                                    <input
+                                        class="form-control"
+                                        type="file"
+                                        id="cameraFile{{ m['id'] }}"
+                                        name="documents"
+                                        accept="image/*"
+                                        capture="environment"
+                                        onchange="document.getElementById('docForm{{ m['id'] }}').submit();"
+                                        style="position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;"
+                                    >
+                                    <div class="d-flex gap-2 mt-2">
+                                        <label for="cameraFile{{ m['id'] }}" class="btn btn-secondary mb-0">Scatta foto</label>
+                                        <button type="submit" class="btn btn-primary">Carica</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-12">
+            <div class="alert alert-info">Nessun QR da mostrare.</div>
+        </div>
+        {% endfor %}
+    </div>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary mt-4">Torna alla dashboard</a>
+
+    {# Modali per la gestione dei documenti dei bancali #}
+    {% if pallet_ids %}
+    {% for pid in pallet_ids %}
+    <div class="modal fade" id="palletDocsModal{{ pid }}" tabindex="-1" aria-labelledby="palletDocsModalLabel{{ pid }}" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="palletDocsModalLabel{{ pid }}">Documenti bancale ID {{ pid }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+                </div>
+                <div class="modal-body">
+                    {% set pdocs = attachments_pallet_map.get(pid, []) %}
+                    {% if pdocs %}
+                    <ul class="list-group mb-3">
+                        {% for d in pdocs %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <a href="{{ url_for('download_doc', doc_id=d['id']) }}" target="_blank">{{ d['original_name'] }}</a>
+                            </div>
+                            <form method="post" action="{{ url_for('delete_doc', doc_id=d['id']) }}" onsubmit="return confirm('Eliminare questo documento?');" class="ms-3">
+                                <input type="hidden" name="next" value="{{ request.full_path }}">
+                                <button class="btn btn-sm btn-danger" type="submit">Elimina</button>
+                            </form>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p>Nessun documento caricato.</p>
+                    {% endif %}
+                    <form id="palletDocForm{{ pid }}" method="post" action="{{ url_for('upload_docs', material_id=pid) }}" enctype="multipart/form-data">
+                        <input type="hidden" name="next" value="{{ request.full_path }}">
+                        <div class="mb-3">
+                            <label for="palletDocsFile{{ pid }}" class="form-label">Carica documenti (PNG, JPG, JPEG, PDF)</label>
+                            <input class="form-control mb-2" type="file" id="palletDocsFile{{ pid }}" name="documents" multiple accept="image/*,.pdf">
+                            <input
+                                class="form-control"
+                                type="file"
+                                id="palletCameraFile{{ pid }}"
+                                name="documents"
+                                accept="image/*"
+                                capture="environment"
+                                onchange="document.getElementById('palletDocForm{{ pid }}').submit();"
+                                style="position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;"
+                            >
+                            <div class="d-flex gap-2 mt-2">
+                                <label for="palletCameraFile{{ pid }}" class="btn btn-secondary mb-0">Scatta foto</label>
+                                <button type="submit" class="btn btn-primary">Carica</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+</div>
+{% endblock %}
