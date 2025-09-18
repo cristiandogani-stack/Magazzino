@@ -1,21 +1,21 @@
 @echo off
 cd /d C:\Users\cristian.dogani\Desktop\magazzino_cd
 
-:: Se è la prima volta, inizializza il repo
+:: Inizializza git se non esiste ancora
 if not exist ".git" (
     echo Inizializzazione repository Git...
     git init
     git branch -M main
-    git remote add origin https://github.com/cristiandogani-stack/Mag.git
+    git remote add origin https://github.com/cristiandogani-stack/Magazzino.git
 )
 
 :: Aggiungi tutti i file
 git add .
 
-:: Commit con data e ora per tener traccia delle versioni
-git commit -m "Aggiornamento del %date% %time%"
+:: Commit con data/ora
+git commit -m "Aggiornamento forzato del %date% %time%" 2>nul
 
-:: Invia su GitHub
-git push -u origin main
+:: Forza il push, sovrascrivendo il remoto
+git push -u origin main --force-with-lease
 
 pause
