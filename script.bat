@@ -1,7 +1,13 @@
 @echo off
+setlocal
+
 cd /d C:\Users\cristian.dogani\Desktop\magazzino_cd
 
-:: Inizializza git se non esiste ancora
+:: Config base (solo la prima volta; modifica l'email se serve)
+git config user.name "cristiandogani-stack" 1>nul 2>nul
+git config user.email "you@example.com" 1>nul 2>nul
+
+:: Inizializza repo se non esiste
 if not exist ".git" (
     echo Inizializzazione repository Git...
     git init
@@ -9,13 +15,24 @@ if not exist ".git" (
     git remote add origin https://github.com/cristiandogani-stack/Magazzino.git
 )
 
-:: Aggiungi tutti i file
-git add .
+echo.
+echo === Aggiorno riferimenti remoti (fetch) ===
+git fetch origin
 
-:: Commit con data/ora
+:: Aggiungi tutto e crea commit (ok anche se non ci sono modifiche)
+git add .
 git commit -m "Aggiornamento forzato del %date% %time%" 2>nul
 
-:: Forza il push, sovrascrivendo il remoto
+echo.
+echo === Push con force-with-lease (sicuro) ===
 git push -u origin main --force-with-lease
+if %errorlevel% EQU 0 goto :OK
 
-pause
+echo.
+echo *** Push rifiutato (stale info o divergenze persistenti). ***
+echo Se sei SICURO di voler sovrascrivere il remoto ignorando il lease,
+set /p CONF=digita "YES" per forzare completamente (--force): 
+if /I "%CONF%" NEQ "YES" goto :END
+
+echo.
+echo === Push con --force (sovr
