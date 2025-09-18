@@ -6,7 +6,7 @@ if not exist ".git" (
     echo Inizializzazione repository Git...
     git init
     git branch -M main
-    git remote add origin https://github.com/cristiandogani-stack/Magazzino.git
+    git remote add origin https://github.com/cristiandogani-stack/Mag.git
 )
 
 :: Aggiungi tutti i file
