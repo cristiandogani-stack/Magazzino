@@ -1,0 +1,5 @@
+=============================================================
+Avvio: 18/09/2025 13:41:00,25 
+C:\Program Files\Git\cmd\git.exe
+C:\Program Files\Git\mingw64\bin\git.exe
+https://github.com/cristiandogani-stack/Magazzino.git
